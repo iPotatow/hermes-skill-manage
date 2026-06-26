@@ -73,6 +73,37 @@
     return source;
   }
 
+  function normalizeSource(row) {
+    const source = String(row.source || "").toLowerCase();
+    const trust = String(row.trustLevel || row.trust || "").toLowerCase();
+    const raw = String(row.rawSource || row.source || "").toLowerCase();
+    if (source === "builtin") return "builtin";
+    if (source === "local" && trust === "local") return "local";
+    if (source === "hub-installed") return "hub-installed";
+    if (trust === "community" || trust === "official") return "hub-installed";
+    if (raw && raw !== "local" && raw !== "builtin") return "hub-installed";
+    return source || "local";
+  }
+
+  function normalizeRows(rows) {
+    return rows.map(function (row) {
+      const source = normalizeSource(row);
+      return Object.assign({}, row, {
+        source: source,
+        rawSource: row.rawSource || row.source || source,
+        trustLevel: row.trustLevel || row.trust || (source === "hub-installed" ? "community" : source),
+        status: row.status || (row.enabled === false ? "disabled" : "enabled"),
+      });
+    });
+  }
+
+  function countRows(rows) {
+    return rows.reduce(function (acc, row) {
+      acc[row.source] = (acc[row.source] || 0) + 1;
+      return acc;
+    }, {});
+  }
+
   function SourcePanel(props) {
     return h("aside", { className: "sm-sidebar", "aria-label": "来源筛选" },
       h("div", { className: "sm-filter-card" },
@@ -317,8 +348,11 @@
       });
     }
 
-    const rows = data && data.skills ? data.skills : [];
-    const counts = data && data.counts ? data.counts : {};
+    const rawRows = data && data.skills ? data.skills : [];
+    const rows = useMemo(function () { return normalizeRows(rawRows); }, [rawRows]);
+    const counts = useMemo(function () { return countRows(rows); }, [rows]);
+    const enabledCount = rows.filter(function (row) { return row.status !== "disabled"; }).length;
+    const disabledCount = rows.length - enabledCount;
     const categories = useMemo(function () {
       const set = new Set(["all"]);
       rows.forEach(function (row) { set.add(row.category || "(root)"); });
@@ -344,7 +378,7 @@
           h("h1", null, "技能管理"),
           h("p", null, "按来源管理 Hermes 技能，保留 Hermes skills list 的清单结构。")
         ),
-        h(StatStrip, { counts: counts, enabled: data ? data.enabledCount : 0 })
+        h(StatStrip, { counts: counts, enabled: enabledCount })
       ),
       h("div", { className: "sm-shell" },
         h(SourcePanel, {
@@ -352,8 +386,8 @@
           setSource: setSource,
           counts: counts,
           total: rows.length,
-          enabled: data ? data.enabledCount : 0,
-          disabled: data ? data.disabledCount : 0,
+          enabled: enabledCount,
+          disabled: disabledCount,
         }),
         h("main", { className: "sm-main" },
           h(Toolbar, {
