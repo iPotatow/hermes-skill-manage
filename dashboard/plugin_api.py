@@ -42,6 +42,25 @@ router = APIRouter()
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 STATE_PATH = PLUGIN_ROOT / "state.json"
 
+BUILTIN_DESCRIPTIONS: Dict[str, str] = {
+    "computer-use": "用途：在后台操控用户桌面应用。主要功能：截图识别、点击、输入、拖拽、滚动、快捷键和应用聚焦。依赖要求：需要 computer_use 工具/cua-driver；文档提到可用 hermes computer-use install 安装或启用 Computer Use。适用场景：处理真实桌面应用、非网页界面或必须通过 GUI 完成的操作。",
+    "dogfood": "用途：对 Web 应用做系统化探索测试。主要功能：规划测试范围、浏览页面、检查控制台、交互验证、截图取证、分类问题并生成报告。依赖要求：需要 browser 工具集和目标 URL/测试范围；输出目录可选。适用场景：发布前验收、回归测试、发现前端交互和可访问性问题。",
+    "hermes-agent": "用途：配置、扩展和维护 Hermes Agent。主要功能：提供安装、模型、认证、工具、技能、网关、会话、Cron、Webhook、Profile、排障和贡献指引。依赖要求：需要 Hermes Agent 环境；具体功能可能需要对应 provider 凭据、平台账号或 MCP/网关配置。适用场景：搭建 Hermes、调整配置、排查问题、开发插件或贡献代码。",
+    "baoyu-infographic": "用途：把文本、文件、URL 或主题转成信息图/可视化摘要。主要功能：分析内容、结构化信息、选择布局和风格、生成提示词与图片。依赖要求：需要图像生成工具；输入来源由用户提供，生成时会使用布局/风格参考文件。适用场景：制作信息图、视觉总结、高密度信息大图和教学/产品可视化。",
+    "github-auth": "用途：配置 GitHub 认证。主要功能：检查 git/gh 登录状态，指导 HTTPS Token、SSH Key、gh auth login、Git 身份和 API Token 配置。依赖要求：需要 git；可选 gh CLI；需要 GitHub 账号、PAT 或 SSH Key。适用场景：让 Hermes 能访问仓库、提交推送、处理 PR、Issue 和 CI。",
+    "github-code-review": "用途：审查本地改动或 GitHub PR。主要功能：读取 diff、stat、log，逐文件检查，发现安全/质量问题，查看 PR、checkout PR、发表评论或正式 review。依赖要求：需要 GitHub 认证并在 git 仓库内；PR API 操作需要 gh 或 GITHUB_TOKEN/curl。适用场景：提交前自查、PR 评审、质量和安全问题排查。",
+    "github-issues": "用途：创建、搜索、分类和管理 GitHub Issue。主要功能：查看 Issue、创建 Bug/Feature 模板、增删标签、分配人员、评论、关闭或重开。依赖要求：需要 GitHub 认证；需要在带 GitHub remote 的 git 仓库内或显式指定仓库；可使用 gh 或 GITHUB_TOKEN/curl。适用场景：缺陷跟踪、需求管理、Issue 分流和项目维护。",
+    "github-pr-workflow": "用途：管理 GitHub PR 生命周期。主要功能：创建分支、提交、推送、创建 PR、监控 CI、诊断失败、更新 PR 和合并流程。依赖要求：需要 GitHub 认证并在带 GitHub remote 的 git 仓库内；可使用 gh 或 git + GITHUB_TOKEN/curl。适用场景：从开发分支到 PR、CI、评审和合并的完整协作流程。",
+    "github-repo-management": "用途：管理 GitHub 仓库。主要功能：克隆、创建、fork、同步 fork、查看仓库信息、管理远程仓库、发布和配置。依赖要求：需要 GitHub 认证；可使用 gh，也可使用 git + GITHUB_TOKEN/curl。适用场景：初始化项目、维护仓库、处理 fork/upstream、发布版本和仓库配置。",
+    "obsidian": "用途：读写和维护 Obsidian vault 笔记。主要功能：读取、列出、搜索、创建、追加、定向编辑 Markdown 笔记并添加 wikilink。依赖要求：需要已知 vault 路径；文档约定可用 OBSIDIAN_VAULT_PATH，未设置时使用 ~/Documents/Obsidian Vault。适用场景：整理知识库、检索笔记、生成或更新 Obsidian Markdown 内容。",
+    "hermes-agent-skill-authoring": "用途：编写和维护 Hermes Agent 仓库内的 SKILL.md。主要功能：说明 frontmatter 规则、目录放置、结构、写作质量、验证清单、编辑流程和常见陷阱。依赖要求：需要在 Hermes Agent 仓库内操作；创建/编辑后需要按文档验证并提交。适用场景：新增可随 Hermes 发布的技能、修改内置技能、统一技能文档质量。",
+    "plan": "用途：在只需要计划时生成可执行的 Markdown 计划。主要功能：禁止执行实现，只检查上下文并把目标、方案、步骤、文件、测试、风险写入 .hermes/plans/。依赖要求：未发现明显外部依赖；需要有可写工作区用于保存计划文件。适用场景：复杂需求拆解、实现前设计、交给后续执行者或子任务使用。",
+    "simplify-code": "用途：并行审查近期代码改动并清理值得修复的问题。主要功能：按复用、质量、效率三个方向审查 diff，聚合发现，区分安全/谨慎/高风险修复并验证。依赖要求：需要可获取待审查 diff 的 git 仓库；文档提到使用并行子任务能力。适用场景：提交前清理、减少重复、改善代码质量和发现性能/错误处理问题。",
+    "spike": "用途：用一次性实验验证想法是否可行。主要功能：拆分 2-5 个可验证问题，做必要研究，构建可运行原型，记录 VALIDATED/PARTIAL/INVALIDATED 结论。依赖要求：未发现固定外部依赖；具体实验可能需要相应库、工具或网络资料。适用场景：不确定方案、比较技术路线、正式实现前验证风险。",
+    "systematic-debugging": "用途：用四阶段流程定位技术问题根因。主要功能：建立可复现反馈环、读取错误、检查变更、收集证据、分析模式、形成可证伪假设、修复并验证。依赖要求：未发现固定外部依赖；通常需要能运行相关测试、命令或复现脚本。适用场景：测试失败、生产 Bug、构建失败、性能问题和多次修复无效的故障。",
+    "test-driven-development": "用途：用 TDD 约束功能、修复和重构。主要功能：先写失败测试、确认 RED、写最小实现、确认 GREEN、再重构，并避免一次性横向堆测试。依赖要求：未发现固定外部依赖；需要项目具备可运行的自动化测试环境。适用场景：新增功能、Bug 修复、行为变更和需要高信心重构的开发工作。",
+}
+
 
 class SkillAction(BaseModel):
     source: str = ""
@@ -184,6 +203,10 @@ def _skill_row(skill: Dict[str, Any], hub: Dict[str, Dict[str, Any]], builtin: s
         installed_at = ""
         updated_at = ""
 
+    description = skill.get("description", "") or ""
+    if kind == "builtin":
+        description = BUILTIN_DESCRIPTIONS.get(name, description)
+
     return {
         "name": name,
         "category": category,
@@ -194,7 +217,7 @@ def _skill_row(skill: Dict[str, Any], hub: Dict[str, Dict[str, Any]], builtin: s
         "status": "disabled" if name in disabled else "enabled",
         "installPath": install_path,
         "identifier": identifier,
-        "description": skill.get("description", "") or "",
+        "description": description,
         "installedAt": installed_at,
         "updatedAt": updated_at,
     }
