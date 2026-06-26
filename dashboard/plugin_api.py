@@ -61,6 +61,25 @@ BUILTIN_DESCRIPTIONS: Dict[str, str] = {
     "test-driven-development": "用途：用 TDD 约束功能、修复和重构。主要功能：先写失败测试、确认 RED、写最小实现、确认 GREEN、再重构，并避免一次性横向堆测试。依赖要求：未发现固定外部依赖；需要项目具备可运行的自动化测试环境。适用场景：新增功能、Bug 修复、行为变更和需要高信心重构的开发工作。",
 }
 
+BUILTIN_DESCRIPTIONS_EN: Dict[str, str] = {
+    "computer-use": "Purpose: control the user's desktop in the background. Main features: screen inspection, clicks, typing, dragging, scrolling, keyboard shortcuts, and app focus. Requirements: requires the computer_use tool/cua-driver; the docs mention hermes computer-use install or enabling Computer Use. Best for tasks that must operate native desktop apps or GUI-only workflows.",
+    "dogfood": "Purpose: run systematic exploratory QA on web apps. Main features: plan scope, browse pages, inspect console output, validate interactions, capture screenshots, categorize bugs, and produce reports. Requirements: requires the browser toolset and a target URL/test scope; output directory is optional. Best for pre-release checks, regressions, and finding frontend, interaction, or accessibility issues.",
+    "hermes-agent": "Purpose: configure, extend, and maintain Hermes Agent. Main features: install/setup guidance, model and auth configuration, tools, skills, gateway, sessions, Cron, webhooks, profiles, troubleshooting, and contribution guidance. Requirements: requires a Hermes Agent environment; specific features may need provider credentials, platform accounts, or MCP/gateway configuration. Best for setting up Hermes, tuning configuration, debugging, plugin work, or contributing code.",
+    "baoyu-infographic": "Purpose: turn text, files, URLs, or topics into infographics and visual summaries. Main features: analyze content, structure information, choose layouts and styles, and generate prompts/images. Requirements: requires an image generation tool; inputs are user-provided and generation uses layout/style references. Best for infographics, visual summaries, dense information posters, and education/product visuals.",
+    "github-auth": "Purpose: configure GitHub authentication. Main features: check git/gh login, guide HTTPS tokens, SSH keys, gh auth login, Git identity, and API token setup. Requirements: requires git; gh CLI is optional; requires a GitHub account and PAT or SSH key. Best for enabling Hermes to access repos, push commits, and work with PRs, issues, and CI.",
+    "github-code-review": "Purpose: review local changes or GitHub PRs. Main features: read diffs, stats, logs, inspect files, find security/quality issues, view or checkout PRs, and post comments/reviews. Requirements: requires GitHub authentication and a git repo; PR API operations need gh or GITHUB_TOKEN/curl. Best for pre-commit review, PR review, and quality/security checks.",
+    "github-issues": "Purpose: create, search, triage, and manage GitHub issues. Main features: view issues, create bug/feature templates, add/remove labels, assign users, comment, close, and reopen. Requirements: requires GitHub authentication; requires a git repo with GitHub remote or an explicit repo; can use gh or GITHUB_TOKEN/curl. Best for bug tracking, request management, triage, and project maintenance.",
+    "github-pr-workflow": "Purpose: manage the GitHub PR lifecycle. Main features: create branches, commit, push, open PRs, monitor CI, diagnose failures, update PRs, and merge. Requirements: requires GitHub authentication and a git repo with a GitHub remote; can use gh or git plus GITHUB_TOKEN/curl. Best for the full branch-to-PR-to-CI-to-merge workflow.",
+    "github-repo-management": "Purpose: manage GitHub repositories. Main features: clone, create, fork, sync forks, view repo info, manage remotes, releases, and configuration. Requirements: requires GitHub authentication; can use gh or git plus GITHUB_TOKEN/curl. Best for project initialization, repo maintenance, fork/upstream workflows, releases, and repo configuration.",
+    "obsidian": "Purpose: read and maintain an Obsidian vault. Main features: read, list, search, create, append, and edit Markdown notes, plus add wikilinks. Requirements: requires a known vault path; docs use OBSIDIAN_VAULT_PATH, falling back to ~/Documents/Obsidian Vault. Best for knowledge-base organization, note search, and creating/updating Obsidian Markdown content.",
+    "hermes-agent-skill-authoring": "Purpose: author and maintain in-repo Hermes Agent SKILL.md files. Main features: frontmatter rules, placement, structure, writing quality, validation checklist, editing workflow, and pitfalls. Requirements: requires working in the Hermes Agent repo; new/edited skills should be validated and committed. Best for adding shipped skills, editing built-in skills, and keeping skill docs consistent.",
+    "plan": "Purpose: create an actionable Markdown plan when execution is not requested. Main features: avoid implementation and write goals, approach, steps, files, tests, and risks under .hermes/plans/. Requirements: no obvious external dependency found; needs a writable workspace for the plan file. Best for complex task breakdowns, pre-implementation design, and handoff to later execution.",
+    "simplify-code": "Purpose: review recent code changes in parallel and clean up worthwhile issues. Main features: review diff for reuse, quality, and efficiency; aggregate findings; separate safe/careful/risky fixes; verify changes. Requirements: needs a git repo with a reviewable diff; docs mention parallel subtask capability. Best for pre-commit cleanup, reducing duplication, improving quality, and spotting performance/error-handling issues.",
+    "spike": "Purpose: validate an idea with disposable experiments. Main features: split into 2-5 feasibility questions, research, build runnable prototypes, and record VALIDATED/PARTIAL/INVALIDATED verdicts. Requirements: no fixed external dependency found; specific experiments may need their own libraries, tools, or web research. Best for uncertain approaches, technical comparisons, and risk validation before a real build.",
+    "systematic-debugging": "Purpose: find root causes with a four-phase debugging process. Main features: build a reproducible feedback loop, read errors, inspect changes, gather evidence, analyze patterns, test falsifiable hypotheses, fix, and verify. Requirements: no fixed external dependency found; usually needs runnable tests, commands, or reproduction scripts. Best for test failures, production bugs, build failures, performance issues, and repeated failed fixes.",
+    "test-driven-development": "Purpose: enforce TDD for features, fixes, and refactors. Main features: write a failing test first, verify RED, implement minimally, verify GREEN, then refactor; avoids horizontal test piles. Requirements: no fixed external dependency found; requires a runnable automated test environment. Best for new features, bug fixes, behavior changes, and high-confidence refactoring.",
+}
+
 BUILTIN_DESCRIPTION_HINTS: Dict[str, str] = {
     "airtable": "通过 Airtable REST API 管理记录，支持增删改查、筛选和 upsert。",
     "apple-notes": "通过 memo CLI 管理 Apple Notes，支持创建、搜索和编辑笔记。",
@@ -246,6 +265,16 @@ def _builtin_description(name: str, fallback: str = "") -> str:
     return "用途：内建 Hermes 技能。主要功能：见 bundled SKILL.md 文档。依赖要求：未发现明显依赖。适用场景：需要恢复并使用该内建技能时。"
 
 
+def _builtin_description_en(name: str, fallback: str = "") -> str:
+    if name in BUILTIN_DESCRIPTIONS_EN:
+        return BUILTIN_DESCRIPTIONS_EN[name]
+    if fallback:
+        return fallback
+    if name in BUILTIN_DESCRIPTION_HINTS:
+        return BUILTIN_DESCRIPTION_HINTS[name]
+    return "Built-in Hermes skill. See bundled SKILL.md for full usage, requirements, and workflow details."
+
+
 def _safe_target(rel_path: str) -> Path:
     root = _skills_dir().resolve()
     target = (root / rel_path).resolve()
@@ -295,9 +324,11 @@ def _skill_row(skill: Dict[str, Any], hub: Dict[str, Dict[str, Any]], builtin: s
         installed_at = ""
         updated_at = ""
 
-    description = skill.get("description", "") or ""
+    description_en = skill.get("description", "") or ""
+    description = description_en
     if kind == "builtin":
-        description = _builtin_description(name, description)
+        description = _builtin_description(name, description_en)
+        description_en = _builtin_description_en(name, description_en)
 
     return {
         "name": name,
@@ -310,6 +341,8 @@ def _skill_row(skill: Dict[str, Any], hub: Dict[str, Dict[str, Any]], builtin: s
         "installPath": install_path,
         "identifier": identifier,
         "description": description,
+        "descriptionZh": description,
+        "descriptionEn": description_en,
         "installedAt": installed_at,
         "updatedAt": updated_at,
     }
@@ -333,6 +366,7 @@ def _missing_builtin_rows(current_rows: List[Dict[str, Any]]) -> List[Dict[str, 
         if category == ".":
             category = ""
         description = _builtin_description(name, _read_skill_description(skill_dir))
+        description_en = _builtin_description_en(name, _read_skill_description(skill_dir))
         rows.append({
             "name": name,
             "category": category,
@@ -344,6 +378,8 @@ def _missing_builtin_rows(current_rows: List[Dict[str, Any]]) -> List[Dict[str, 
             "installPath": install_path,
             "identifier": f"bundled/{install_path}",
             "description": description,
+            "descriptionZh": description,
+            "descriptionEn": description_en,
             "installedAt": "",
             "updatedAt": "",
             "canRestore": True,

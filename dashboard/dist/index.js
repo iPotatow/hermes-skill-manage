@@ -11,6 +11,9 @@
   const useEffect = hooks.useEffect;
   const useMemo = hooks.useMemo;
   const useCallback = hooks.useCallback;
+  const useHostI18n = typeof SDK.useI18n === "function" ? SDK.useI18n : function () {
+    return { locale: document.documentElement.lang || navigator.language || "en" };
+  };
 
   const C = SDK.components || {};
   const Input = C.Input || function (props) { return h("input", props); };
@@ -19,6 +22,81 @@
 
   const API = "/api/plugins/skill-manage";
   const SOURCE_ORDER = ["all", "builtin", "hub-installed", "local"];
+  const TEXT = {
+    en: {
+      unknownError: "Unknown error",
+      sourceLabels: { all: "All skills", builtin: "Built-in", "hub-installed": "Hub installed", local: "Local" },
+      stats: { "hub-installed": "Hub installed", builtin: "Built-in", local: "Local", enabled: "Enabled" },
+      searchPlaceholder: "Search Name / Category / Source",
+      allCategories: "all categories",
+      showDeletedBuiltin: "Show deleted built-ins",
+      showDeletedBuiltinTitle: "Hidden by default; enable to show built-in skills that can be restored from the Hermes bundled source.",
+      refresh: "Refresh",
+      refreshing: "Refreshing",
+      empty: "No matching skills",
+      installedSkills: "Installed Skills",
+      columns: { name: "Name", category: "Category", source: "Source", trust: "Trust", status: "Status", actions: "Actions" },
+      noDescription: "No description",
+      actions: { delete: "Delete", reset: "Reset", update: "Update", restore: "Restore", install: "Install", installing: "Installing" },
+      confirmPrompt: function (action, name) { return action + " requires confirmation.\nType the skill name: " + name; },
+      notices: {
+        deleted: function (name) { return "Deleted: " + name; },
+        reset: function (name) { return "Reset: " + name; },
+        updated: function (name) { return "Updated: " + name; },
+        restored: function (name) { return "Restored: " + name; },
+        installed: function (name) { return "Installed: " + name; },
+      },
+      heroKickerFallback: "Hermes skills directory",
+      title: "Skill Manage",
+      subtitle: "Manage Hermes skills by source; deleted built-in skills are hidden by default and can be shown when you need to restore them.",
+      installTitle: "Install skill",
+      installHint: "Supports URL, owner/repo, hub identifier, or optional catalog path.",
+      targetPlaceholder: "identifier / URL / owner/repo",
+      categoryPlaceholder: "category",
+      forceLabel: "force",
+      recentTitle: "Recent actions",
+      recentHint: "Last 8 management actions",
+    },
+    zh: {
+      unknownError: "未知错误",
+      sourceLabels: { all: "全部技能", builtin: "内建", "hub-installed": "Hub 安装", local: "本地" },
+      stats: { "hub-installed": "Hub 安装", builtin: "内建", local: "本地", enabled: "启用" },
+      searchPlaceholder: "搜索名称 / 分类 / 来源",
+      allCategories: "全部分类",
+      showDeletedBuiltin: "显示已删除内建",
+      showDeletedBuiltinTitle: "默认隐藏；开启后显示可从 Hermes bundled 源恢复的内建技能。",
+      refresh: "刷新",
+      refreshing: "刷新中",
+      empty: "没有匹配的技能",
+      installedSkills: "技能清单",
+      columns: { name: "名称", category: "分类", source: "来源", trust: "信任", status: "状态", actions: "操作" },
+      noDescription: "无简介",
+      actions: { delete: "删除", reset: "重置", update: "更新", restore: "恢复", install: "安装", installing: "安装中" },
+      confirmPrompt: function (action, name) { return action + "需要二次确认。\n请输入技能名：" + name; },
+      notices: {
+        deleted: function (name) { return "已删除：" + name; },
+        reset: function (name) { return "已重置：" + name; },
+        updated: function (name) { return "已更新：" + name; },
+        restored: function (name) { return "已恢复：" + name; },
+        installed: function (name) { return "已安装：" + name; },
+      },
+      heroKickerFallback: "Hermes 技能目录",
+      title: "技能管理",
+      subtitle: "按来源管理 Hermes 技能；已删除的内建技能默认隐藏，可按需显示并恢复。",
+      installTitle: "安装技能",
+      installHint: "支持 URL、owner/repo、hub 标识或 optional catalog 路径。",
+      targetPlaceholder: "identifier / URL / owner/repo",
+      categoryPlaceholder: "分类",
+      forceLabel: "force",
+      recentTitle: "最近操作",
+      recentHint: "最近 8 条管理动作",
+    },
+  };
+
+  function languageFromLocale(locale) {
+    const raw = String(locale || "").toLowerCase();
+    return raw.indexOf("zh") === 0 ? "zh" : "en";
+  }
 
   function api(path, options) {
     if (SDK.fetchJSON) return SDK.fetchJSON(API + path, options);
@@ -39,8 +117,8 @@
     return Array.prototype.slice.call(arguments).filter(Boolean).join(" ");
   }
 
-  function parseError(err) {
-    const raw = err && err.message ? String(err.message) : String(err || "未知错误");
+  function parseError(err, text) {
+    const raw = err && err.message ? String(err.message) : String(err || (text && text.unknownError) || "Unknown error");
     try {
       const parsed = JSON.parse(raw.replace(/^\d+:\s*/, ""));
       return parsed.detail || raw;
@@ -49,8 +127,8 @@
     }
   }
 
-  function confirmName(name, actionLabel) {
-    const value = window.prompt(actionLabel + "需要二次确认。\n请输入技能名：" + name);
+  function confirmName(name, actionLabel, text) {
+    const value = window.prompt(text.confirmPrompt(actionLabel, name));
     return value === name ? value : null;
   }
 
@@ -65,11 +143,8 @@
     return h("span", { className: cx("sm-pill", "sm-pill--" + (props.tone || "default")) }, props.children);
   }
 
-  function sourceLabel(source) {
-    if (source === "all") return "全部技能";
-    if (source === "builtin") return "内建";
-    if (source === "hub-installed") return "Hub 安装";
-    if (source === "local") return "本地";
+  function sourceLabel(source, text) {
+    if (text.sourceLabels[source]) return text.sourceLabels[source];
     return source;
   }
 
@@ -111,7 +186,7 @@
   }
 
   function SourceTabs(props) {
-    return h("div", { className: "sm-source-tabs", "aria-label": "来源筛选" },
+    return h("div", { className: "sm-source-tabs", "aria-label": props.text.columns.source },
       SOURCE_ORDER.map(function (source) {
         const count = source === "all" ? props.total : props.counts[source] || 0;
         return h("button", {
@@ -120,7 +195,7 @@
           className: cx("sm-source", props.source === source && "sm-source--active"),
           onClick: function () { props.setSource(source); },
         },
-          h("span", null, sourceLabel(source)),
+          h("span", null, sourceLabel(source, props.text)),
           h("code", null, count)
         );
       })
@@ -129,10 +204,10 @@
 
   function StatStrip(props) {
     const items = [
-      ["hub-installed", props.counts["hub-installed"] || 0, "Hub 安装"],
-      ["builtin", props.counts.builtin || 0, "内建"],
-      ["local", props.counts.local || 0, "本地"],
-      ["enabled", props.enabled || 0, "启用"],
+      ["hub-installed", props.counts["hub-installed"] || 0, props.text.stats["hub-installed"]],
+      ["builtin", props.counts.builtin || 0, props.text.stats.builtin],
+      ["local", props.counts.local || 0, props.text.stats.local],
+      ["enabled", props.enabled || 0, props.text.stats.enabled],
     ];
     return h("div", { className: "sm-stat-strip" },
       items.map(function (item) {
@@ -152,91 +227,93 @@
         setSource: props.setSource,
         counts: props.counts,
         total: props.total,
+        text: props.text,
       }),
       h(Input, {
         className: "sm-input",
         value: props.query,
         onChange: function (e) { props.setQuery(e.target.value); },
-        placeholder: "搜索 Name / Category / Source",
+        placeholder: props.text.searchPlaceholder,
       }),
       h("select", {
         className: "sm-select",
         value: props.category,
         onChange: function (e) { props.setCategory(e.target.value); },
       }, props.categories.map(function (category) {
-        return h("option", { key: category, value: category }, category === "all" ? "all categories" : category);
+        return h("option", { key: category, value: category }, category === "all" ? props.text.allCategories : category);
       })),
       h("span", { className: "sm-result-count" }, props.filtered + " / " + props.total),
-      h("label", { className: "sm-toggle", title: "默认隐藏；开启后显示可恢复的已删除内建技能" },
+      h("label", { className: "sm-toggle", title: props.text.showDeletedBuiltinTitle },
         h("input", {
           type: "checkbox",
           checked: props.showMissingBuiltin,
           onChange: function (e) { props.setShowMissingBuiltin(e.target.checked); },
         }),
-        h("span", null, "显示已删除内建"),
+        h("span", null, props.text.showDeletedBuiltin),
         h("code", null, props.missingBuiltinCount || 0)
       ),
-      h(Button, { onClick: props.onRefresh, disabled: props.loading }, props.loading ? "刷新中" : "刷新")
+      h(Button, { onClick: props.onRefresh, disabled: props.loading }, props.loading ? props.text.refreshing : props.text.refresh)
     );
   }
 
   function SkillsTable(props) {
     if (!props.rows.length) {
-      return h("div", { className: "sm-empty" }, "没有匹配的技能");
+      return h("div", { className: "sm-empty" }, props.text.empty);
     }
 
     function run(row, action) {
       if (action === "delete") {
-        const confirm = confirmName(row.name, "删除");
+        const confirm = confirmName(row.name, props.text.actions.delete, props.text);
         if (!confirm) return;
-        props.onAction("/delete", { source: row.kind, name: row.name, confirm: confirm }, "已删除：" + row.name);
+        props.onAction("/delete", { source: row.kind, name: row.name, confirm: confirm }, props.text.notices.deleted(row.name));
         return;
       }
       if (action === "reset") {
-        props.onAction("/reset", { source: row.kind, name: row.name }, "已重置：" + row.name);
+        props.onAction("/reset", { source: row.kind, name: row.name }, props.text.notices.reset(row.name));
         return;
       }
       if (action === "update") {
-        props.onAction("/update", { source: row.kind, name: row.name }, "已更新：" + row.name);
+        props.onAction("/update", { source: row.kind, name: row.name }, props.text.notices.updated(row.name));
         return;
       }
       if (action === "restore") {
-        props.onAction("/restore", { source: "builtin", name: row.name }, "已恢复：" + row.name);
+        props.onAction("/restore", { source: "builtin", name: row.name }, props.text.notices.restored(row.name));
       }
     }
 
     return h("div", { className: "sm-table-wrap" },
       h("table", { className: "sm-table" },
-        h("caption", null, "Installed Skills · " + props.rows.length),
+        h("caption", null, props.text.installedSkills + " · " + props.rows.length),
         h("thead", null,
           h("tr", null,
-            h("th", null, "Name"),
-            h("th", null, "Category"),
-            h("th", null, "Source"),
-            h("th", null, "Trust"),
-            h("th", null, "Status"),
-            h("th", null, "操作")
+            h("th", null, props.text.columns.name),
+            h("th", null, props.text.columns.category),
+            h("th", null, props.text.columns.source),
+            h("th", null, props.text.columns.trust),
+            h("th", null, props.text.columns.status),
+            h("th", null, props.text.columns.actions)
           )
         ),
         h("tbody", null,
           props.rows.map(function (row) {
             const busy = props.busyKey === row.kind + ":" + row.name;
             const deleted = row.status === "deleted";
+            const description = props.lang === "zh" ? (row.descriptionZh || row.description) : (row.descriptionEn || row.description);
             return h("tr", { key: row.kind + ":" + row.name },
               h("td", { className: "sm-name", title: row.installPath },
                 h("strong", null, row.name),
-                row.description ? h("span", null, row.description) : h("span", { className: "sm-name__empty" }, "无简介")
+                description ? h("span", null, description) : h("span", { className: "sm-name__empty" }, props.text.noDescription)
               ),
               h("td", { className: "sm-dim" }, row.category || ""),
               h("td", null, h(Pill, { tone: row.kind, title: row.kind }, row.source)),
               h("td", { className: "sm-dim" }, row.trustLevel || "-"),
               h("td", null, h(Pill, { tone: deleted ? "deleted" : row.status === "enabled" ? "enabled" : "disabled" }, row.status || "enabled")),
               h("td", { className: "sm-actions" },
-                deleted ? h(Button, { disabled: busy, onClick: function () { run(row, "restore"); } }, "恢复") : null,
-                !deleted && row.kind === "builtin" ? h(Button, { disabled: busy, onClick: function () { run(row, "reset"); } }, "重置") : null,
-                !deleted && row.kind === "hub-installed" ? h(Button, { disabled: busy, onClick: function () { run(row, "reset"); } }, "重置") : null,
-                !deleted && row.kind === "hub-installed" ? h(Button, { disabled: busy, onClick: function () { run(row, "update"); } }, "更新") : null,
-                !deleted ? h(Button, { kind: "danger", disabled: busy, onClick: function () { run(row, "delete"); } }, "删除") : null
+                deleted ? h(Button, { disabled: busy, onClick: function () { run(row, "restore"); } }, props.text.actions.restore) : null,
+                !deleted && row.kind === "builtin" ? h(Button, { disabled: busy, onClick: function () { run(row, "reset"); } }, props.text.actions.reset) : null,
+                !deleted && row.kind === "hub-installed" ? h(Button, { disabled: busy, onClick: function () { run(row, "reset"); } }, props.text.actions.reset) : null,
+                !deleted && row.kind === "hub-installed" ? h(Button, { disabled: busy, onClick: function () { run(row, "update"); } }, props.text.actions.update) : null,
+                !deleted ? h(Button, { kind: "danger", disabled: busy, onClick: function () { run(row, "delete"); } }, props.text.actions.delete) : null
               )
             );
           })
@@ -256,28 +333,28 @@
         target: target.trim(),
         category: category.trim(),
         force: force,
-      }, "已安装：" + target.trim(), function () {
+      }, props.text.notices.installed(target.trim()), function () {
         setTarget("");
       });
     }
 
     return h(Card, { className: "sm-card" }, h(CardContent, { className: "sm-card__content" },
       h("div", { className: "sm-card__head" },
-        h("div", null, h("h3", null, "安装技能"), h("p", null, "支持 URL、owner/repo、hub 标识或 optional catalog 路径。")),
-        h(Button, { disabled: !target.trim() || props.busy, onClick: install }, props.busy ? "安装中" : "安装")
+        h("div", null, h("h3", null, props.text.installTitle), h("p", null, props.text.installHint)),
+        h(Button, { disabled: !target.trim() || props.busy, onClick: install }, props.busy ? props.text.actions.installing : props.text.actions.install)
       ),
       h("div", { className: "sm-install" },
         h(Input, {
           className: "sm-input",
           value: target,
           onChange: function (e) { setTarget(e.target.value); },
-          placeholder: "identifier / URL / owner/repo",
+          placeholder: props.text.targetPlaceholder,
         }),
         h(Input, {
           className: "sm-input",
           value: category,
           onChange: function (e) { setCategory(e.target.value); },
-          placeholder: "category",
+          placeholder: props.text.categoryPlaceholder,
         }),
         h("label", { className: "sm-check" },
           h("input", {
@@ -285,7 +362,7 @@
             checked: force,
             onChange: function (e) { setForce(e.target.checked); },
           }),
-          h("span", null, "force")
+          h("span", null, props.text.forceLabel)
         )
       ),
       props.optional && props.optional.length ? h("div", { className: "sm-catalog" },
@@ -307,7 +384,7 @@
     if (!props.history.length) return null;
     return h(Card, { className: "sm-card" }, h(CardContent, { className: "sm-card__content" },
       h("div", { className: "sm-card__head" },
-        h("div", null, h("h3", null, "最近操作"), h("p", null, "最近 8 条管理动作"))
+        h("div", null, h("h3", null, props.text.recentTitle), h("p", null, props.text.recentHint))
       ),
       h("div", { className: "sm-history" },
         props.history.slice(0, 8).map(function (item, index) {
@@ -322,6 +399,9 @@
   }
 
   function SkillManagePage() {
+    const hostI18n = useHostI18n() || {};
+    const lang = languageFromLocale(hostI18n.locale);
+    const text = TEXT[lang];
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [query, setQuery] = useState("");
@@ -337,11 +417,11 @@
       return api("/inventory").then(function (next) {
         setData(next);
       }).catch(function (err) {
-        setToast({ text: parseError(err), error: true });
+        setToast({ text: parseError(err, text), error: true });
       }).finally(function () {
         setLoading(false);
       });
-    }, []);
+    }, [text]);
 
     useEffect(function () { load(); }, [load]);
 
@@ -359,7 +439,7 @@
         if (after) after();
         return load();
       }).catch(function (err) {
-        notice(parseError(err), true);
+        notice(parseError(err, text), true);
       }).finally(function () {
         setBusyKey("");
         setInstallBusy(false);
@@ -398,11 +478,11 @@
       toast ? h("div", { className: cx("sm-toast", toast.error && "sm-toast--error") }, toast.text) : null,
       h("header", { className: "sm-hero" },
         h("div", null,
-          h("p", { className: "sm-kicker" }, data && data.meta ? data.meta.skillsDir : "Hermes 技能目录"),
-          h("h1", null, "技能管理"),
-          h("p", null, "按来源管理 Hermes 技能；已删除的内建技能默认隐藏，可按需显示并恢复。")
+          h("p", { className: "sm-kicker" }, data && data.meta ? data.meta.skillsDir : text.heroKickerFallback),
+          h("h1", null, text.title),
+          h("p", null, text.subtitle)
         ),
-        h(StatStrip, { counts: counts, enabled: enabledCount })
+        h(StatStrip, { counts: counts, enabled: enabledCount, text: text })
       ),
       h("main", { className: "sm-main" },
         h(Toolbar, {
@@ -419,15 +499,16 @@
           showMissingBuiltin: showMissingBuiltin,
           setShowMissingBuiltin: setShowMissingBuiltin,
           missingBuiltinCount: data ? data.missingBuiltinCount : 0,
+          text: text,
           loading: loading,
           onRefresh: load,
         }),
         h(Card, { className: "sm-card sm-table-card" }, h(CardContent, { className: "sm-card__content" },
-          h(SkillsTable, { rows: filtered, busyKey: busyKey, onAction: onAction })
+          h(SkillsTable, { rows: filtered, busyKey: busyKey, onAction: onAction, text: text, lang: lang })
         )),
         h("div", { className: "sm-secondary-grid" },
-          h(InstallPanel, { optional: data && data.optional ? data.optional : [], busy: installBusy, onAction: onAction }),
-          h(HistoryPanel, { history: data && data.history ? data.history : [] })
+          h(InstallPanel, { optional: data && data.optional ? data.optional : [], busy: installBusy, onAction: onAction, text: text }),
+          h(HistoryPanel, { history: data && data.history ? data.history : [], text: text })
         )
       )
     );
