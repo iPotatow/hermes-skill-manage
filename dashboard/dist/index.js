@@ -110,33 +110,20 @@
     }, {});
   }
 
-  function SourcePanel(props) {
-    return h("aside", { className: "sm-sidebar", "aria-label": "来源筛选" },
-      h("div", { className: "sm-filter-card" },
-        h("div", { className: "sm-filter-head" },
-          h("span", null, "FILTERS"),
-          h("strong", null, props.total)
-        ),
-        h("div", { className: "sm-source-list" },
-          SOURCE_ORDER.map(function (source) {
-            const count = source === "all" ? props.total : props.counts[source] || 0;
-            return h("button", {
-              key: source,
-              type: "button",
-              className: cx("sm-source", props.source === source && "sm-source--active"),
-              onClick: function () { props.setSource(source); },
-            },
-              h("span", null, sourceLabel(source)),
-              h("code", null, count)
-            );
-          })
-        ),
-        h("div", { className: "sm-filter-meta" },
-          h("span", null, "状态"),
-          h("strong", null, props.enabled + " enabled"),
-          h("small", null, props.disabled + " disabled")
-        )
-      )
+  function SourceTabs(props) {
+    return h("div", { className: "sm-source-tabs", "aria-label": "来源筛选" },
+      SOURCE_ORDER.map(function (source) {
+        const count = source === "all" ? props.total : props.counts[source] || 0;
+        return h("button", {
+          key: source,
+          type: "button",
+          className: cx("sm-source", props.source === source && "sm-source--active"),
+          onClick: function () { props.setSource(source); },
+        },
+          h("span", null, sourceLabel(source)),
+          h("code", null, count)
+        );
+      })
     );
   }
 
@@ -160,6 +147,12 @@
 
   function Toolbar(props) {
     return h("div", { className: "sm-toolbar" },
+      h(SourceTabs, {
+        source: props.source,
+        setSource: props.setSource,
+        counts: props.counts,
+        total: props.total,
+      }),
       h(Input, {
         className: "sm-input",
         value: props.query,
@@ -216,7 +209,10 @@
           props.rows.map(function (row) {
             const busy = props.busyKey === row.kind + ":" + row.name;
             return h("tr", { key: row.kind + ":" + row.name },
-              h("td", { className: "sm-name", title: row.installPath }, row.name),
+              h("td", { className: "sm-name", title: row.installPath },
+                h("strong", null, row.name),
+                row.description ? h("span", null, row.description) : h("span", { className: "sm-name__empty" }, "无简介")
+              ),
               h("td", { className: "sm-dim" }, row.category || ""),
               h("td", null, h(Pill, { tone: row.kind, title: row.kind }, row.source)),
               h("td", { className: "sm-dim" }, row.trustLevel || "-"),
@@ -386,34 +382,27 @@
         ),
         h(StatStrip, { counts: counts, enabled: enabledCount })
       ),
-      h("div", { className: "sm-shell" },
-        h(SourcePanel, {
+      h("main", { className: "sm-main" },
+        h(Toolbar, {
+          query: query,
+          setQuery: setQuery,
           source: source,
           setSource: setSource,
           counts: counts,
+          category: category,
+          setCategory: setCategory,
+          categories: categories,
           total: rows.length,
-          enabled: enabledCount,
-          disabled: disabledCount,
+          filtered: filtered.length,
+          loading: loading,
+          onRefresh: load,
         }),
-        h("main", { className: "sm-main" },
-          h(Toolbar, {
-            query: query,
-            setQuery: setQuery,
-            category: category,
-            setCategory: setCategory,
-            categories: categories,
-            total: rows.length,
-            filtered: filtered.length,
-            loading: loading,
-            onRefresh: load,
-          }),
-          h(Card, { className: "sm-card sm-table-card" }, h(CardContent, { className: "sm-card__content" },
-            h(SkillsTable, { rows: filtered, busyKey: busyKey, onAction: onAction })
-          )),
-          h("div", { className: "sm-secondary-grid" },
-            h(InstallPanel, { optional: data && data.optional ? data.optional : [], busy: installBusy, onAction: onAction }),
-            h(HistoryPanel, { history: data && data.history ? data.history : [] })
-          )
+        h(Card, { className: "sm-card sm-table-card" }, h(CardContent, { className: "sm-card__content" },
+          h(SkillsTable, { rows: filtered, busyKey: busyKey, onAction: onAction })
+        )),
+        h("div", { className: "sm-secondary-grid" },
+          h(InstallPanel, { optional: data && data.optional ? data.optional : [], busy: installBusy, onAction: onAction }),
+          h(HistoryPanel, { history: data && data.history ? data.history : [] })
         )
       )
     );
