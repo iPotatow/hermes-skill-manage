@@ -116,6 +116,14 @@ def _state_key(source: str, name: str) -> str:
     return f"{source}:{name}"
 
 
+def _display_source(raw_source: str) -> str:
+    if raw_source == "builtin":
+        return "builtin"
+    if raw_source == "local":
+        return "local"
+    return "hub-installed"
+
+
 def _read_frontmatter(skill_md: Path) -> Dict[str, str]:
     result = {"name": skill_md.parent.name, "description": ""}
     try:
@@ -192,7 +200,8 @@ def _skill_row(skill_md: Path, hub_by_path: Dict[str, Dict[str, Any]], bundled: 
     entry = hub_by_path.get(rel)
 
     if entry:
-        source = entry.get("source", "hub")
+        source = "hub-installed"
+        original_source = entry.get("source", "hub")
         trust_level = entry.get("trust_level", "community")
         scan_verdict = entry.get("scan_verdict", "n/a")
         identifier = entry.get("identifier", "")
@@ -203,6 +212,7 @@ def _skill_row(skill_md: Path, hub_by_path: Dict[str, Dict[str, Any]], bundled: 
         trust_level = "builtin"
         scan_verdict = "bundled"
         identifier = f"bundled/{rel}"
+        original_source = "builtin"
         installed_at = ""
         updated_at = ""
     else:
@@ -210,6 +220,7 @@ def _skill_row(skill_md: Path, hub_by_path: Dict[str, Dict[str, Any]], bundled: 
         trust_level = "local"
         scan_verdict = "local"
         identifier = ""
+        original_source = "local"
         installed_at = ""
         updated_at = ""
 
@@ -222,6 +233,7 @@ def _skill_row(skill_md: Path, hub_by_path: Dict[str, Dict[str, Any]], bundled: 
     return {
         "name": name,
         "source": source,
+        "originalSource": original_source,
         "category": category,
         "installPath": rel,
         "description": meta["description"],
@@ -252,10 +264,11 @@ def _inventory_rows() -> List[Dict[str, Any]]:
 
 
 def _find_skill(source: str, name: str) -> Dict[str, Any]:
+    normalized_source = _display_source(source)
     for row in _inventory_rows():
-        if row["source"] == source and name in {row["name"], Path(row["installPath"]).name}:
+        if row["source"] == normalized_source and name in {row["name"], Path(row["installPath"]).name}:
             return row
-    raise HTTPException(status_code=404, detail=f"未找到技能：{source}:{name}")
+    raise HTTPException(status_code=404, detail=f"未找到技能：{normalized_source}:{name}")
 
 
 def _backup_record(row: Dict[str, Any]) -> Dict[str, Any]:
@@ -379,7 +392,7 @@ async def delete_skill(action: SkillAction) -> Dict[str, Any]:
     shutil.copytree(target, backup_dir)
     record["backup_dir"] = str(backup_dir)
 
-    if row["source"] in {"skills.sh", "clawhub", "github", "official", "hub"}:
+    if row["source"] == "hub-installed":
         try:
             from tools.skills_hub import uninstall_skill
             ok, message = uninstall_skill(row["name"])
@@ -455,3 +468,20 @@ async def install_skill(action: SkillAction) -> Dict[str, Any]:
     })
     _save_state(state)
     return {"ok": True}
+
+
+@router.post("/reset")
+async def reset_skill(action: SkillAction) -> Dict[str, Any]:
+    name = action.name or action.target
+    if not name:
+        raise HTTPException(status_code=400, detail="请输入要重置的技能名")
+    row = _find_skill("builtin", name)
+    try:
+        from hermes_cli.skills_hub import do_reset
+        do_reset(row["name"], restore=True, console=None, skip_confirm=True)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    state = _load_state()
+    _history(state, {"action": "reset", "source": "builtin", "name": row["name"]})
+    _save_state(state)
+    return {"ok": True, "skill": row}

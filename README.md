@@ -5,10 +5,12 @@
 
 ## 功能
 
-- 按来源统计和筛选技能：`builtin`、`skills.sh`、`clawhub`、`local`
+- 按来源统计和筛选技能：`builtin`、`hub-installed`、`local`
 - 按分类目录筛选技能
 - 搜索技能名称、路径、描述和来源标识
 - 查看技能详情、`SKILL.md` 内容和文件列表
+- 对 `builtin` 技能执行重置
+- 对 `hub-installed` 技能执行强制重新安装
 - 删除非内置技能，并自动备份到插件的 `trash/` 目录
 - 从删除备份恢复技能
 - 从 hub、URL、仓库或 optional catalog 安装技能
@@ -48,6 +50,6 @@ curl http://127.0.0.1:9119/api/dashboard/plugins/rescan
 
 ## 名称
 
-- Dashboard 名称：`Skill manage（技能管理）`
+- Dashboard 菜单名称：`技能管理`
 - Dashboard 插件 ID：`skill-manage`
 - 安装目录：`~/.hermes/plugins/skill-vault`

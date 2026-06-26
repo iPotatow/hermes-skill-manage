@@ -1,6 +1,6 @@
 {
   "name": "skill-manage",
-  "label": "Skill manage（技能管理）",
+  "label": "技能管理",
   "description": "按来源管理 Hermes 技能清单与生命周期。",
   "icon": "Archive",
   "version": "0.3.0",
