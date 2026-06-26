@@ -65,6 +65,62 @@
     return h("span", { className: cx("sm-pill", "sm-pill--" + (props.tone || "default")) }, props.children);
   }
 
+  function sourceLabel(source) {
+    if (source === "all") return "全部技能";
+    if (source === "builtin") return "内建";
+    if (source === "hub-installed") return "Hub 安装";
+    if (source === "local") return "本地";
+    return source;
+  }
+
+  function SourcePanel(props) {
+    return h("aside", { className: "sm-sidebar", "aria-label": "来源筛选" },
+      h("div", { className: "sm-filter-card" },
+        h("div", { className: "sm-filter-head" },
+          h("span", null, "FILTERS"),
+          h("strong", null, props.total)
+        ),
+        h("div", { className: "sm-source-list" },
+          SOURCE_ORDER.map(function (source) {
+            const count = source === "all" ? props.total : props.counts[source] || 0;
+            return h("button", {
+              key: source,
+              type: "button",
+              className: cx("sm-source", props.source === source && "sm-source--active"),
+              onClick: function () { props.setSource(source); },
+            },
+              h("span", null, sourceLabel(source)),
+              h("code", null, count)
+            );
+          })
+        ),
+        h("div", { className: "sm-filter-meta" },
+          h("span", null, "状态"),
+          h("strong", null, props.enabled + " enabled"),
+          h("small", null, props.disabled + " disabled")
+        )
+      )
+    );
+  }
+
+  function StatStrip(props) {
+    const items = [
+      ["hub-installed", props.counts["hub-installed"] || 0, "Hub 安装"],
+      ["builtin", props.counts.builtin || 0, "内建"],
+      ["local", props.counts.local || 0, "本地"],
+      ["enabled", props.enabled || 0, "启用"],
+    ];
+    return h("div", { className: "sm-stat-strip" },
+      items.map(function (item) {
+        return h("div", { className: "sm-stat", key: item[0] },
+          h("span", null, item[2]),
+          h("strong", null, item[1]),
+          h("i", null, item[0])
+        );
+      })
+    );
+  }
+
   function Toolbar(props) {
     return h("div", { className: "sm-toolbar" },
       h(Input, {
@@ -73,16 +129,6 @@
         onChange: function (e) { props.setQuery(e.target.value); },
         placeholder: "搜索 Name / Category / Source",
       }),
-      h("div", { className: "sm-tabs" },
-        SOURCE_ORDER.map(function (source) {
-          return h("button", {
-            key: source,
-            type: "button",
-            className: cx("sm-tab", props.source === source && "sm-tab--active"),
-            onClick: function () { props.setSource(source); },
-          }, source === "all" ? "all" : source, h("span", null, source === "all" ? props.total : props.counts[source] || 0));
-        })
-      ),
       h("select", {
         className: "sm-select",
         value: props.category,
@@ -90,6 +136,7 @@
       }, props.categories.map(function (category) {
         return h("option", { key: category, value: category }, category === "all" ? "all categories" : category);
       })),
+      h("span", { className: "sm-result-count" }, props.filtered + " / " + props.total),
       h(Button, { onClick: props.onRefresh, disabled: props.loading }, props.loading ? "刷新中" : "刷新")
     );
   }
@@ -117,7 +164,7 @@
 
     return h("div", { className: "sm-table-wrap" },
       h("table", { className: "sm-table" },
-        h("caption", null, "Installed Skills"),
+        h("caption", null, "Installed Skills · " + props.rows.length),
         h("thead", null,
           h("tr", null,
             h("th", null, "Name"),
@@ -295,31 +342,40 @@
         h("div", null,
           h("p", { className: "sm-kicker" }, data && data.meta ? data.meta.skillsDir : "Hermes 技能目录"),
           h("h1", null, "技能管理"),
-          h("p", null, "列表样式对齐 Hermes skills list，并在每个技能后提供操作列。")
+          h("p", null, "按来源管理 Hermes 技能，保留 Hermes skills list 的清单结构。")
         ),
-        h("div", { className: "sm-summary" },
-          h("strong", null, (counts["hub-installed"] || 0) + " hub-installed, " + (counts.builtin || 0) + " builtin, " + (counts.local || 0) + " local"),
-          h("span", null, (data ? data.enabledCount : 0) + " enabled, " + (data ? data.disabledCount : 0) + " disabled")
-        )
+        h(StatStrip, { counts: counts, enabled: data ? data.enabledCount : 0 })
       ),
-      h(Toolbar, {
-        query: query,
-        setQuery: setQuery,
-        source: source,
-        setSource: setSource,
-        category: category,
-        setCategory: setCategory,
-        categories: categories,
-        counts: counts,
-        total: rows.length,
-        loading: loading,
-        onRefresh: load,
-      }),
-      h(Card, { className: "sm-card" }, h(CardContent, { className: "sm-card__content" },
-        h(SkillsTable, { rows: filtered, busyKey: busyKey, onAction: onAction })
-      )),
-      h(InstallPanel, { optional: data && data.optional ? data.optional : [], busy: installBusy, onAction: onAction }),
-      h(HistoryPanel, { history: data && data.history ? data.history : [] })
+      h("div", { className: "sm-shell" },
+        h(SourcePanel, {
+          source: source,
+          setSource: setSource,
+          counts: counts,
+          total: rows.length,
+          enabled: data ? data.enabledCount : 0,
+          disabled: data ? data.disabledCount : 0,
+        }),
+        h("main", { className: "sm-main" },
+          h(Toolbar, {
+            query: query,
+            setQuery: setQuery,
+            category: category,
+            setCategory: setCategory,
+            categories: categories,
+            total: rows.length,
+            filtered: filtered.length,
+            loading: loading,
+            onRefresh: load,
+          }),
+          h(Card, { className: "sm-card sm-table-card" }, h(CardContent, { className: "sm-card__content" },
+            h(SkillsTable, { rows: filtered, busyKey: busyKey, onAction: onAction })
+          )),
+          h("div", { className: "sm-secondary-grid" },
+            h(InstallPanel, { optional: data && data.optional ? data.optional : [], busy: installBusy, onAction: onAction }),
+            h(HistoryPanel, { history: data && data.history ? data.history : [] })
+          )
+        )
+      )
     );
   }
 
