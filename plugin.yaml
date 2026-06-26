@@ -1,5 +1,5 @@
 name: skill-manage
-version: 0.3.0
+version: 0.3.1
 description: "Dashboard plugin for managing Hermes skills by source: builtin, hub, local, and the official optional catalog."
 author: Hermes Agent
 kind: standalone

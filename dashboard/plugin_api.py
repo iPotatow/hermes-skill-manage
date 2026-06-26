@@ -95,6 +95,14 @@ def _history(event: Dict[str, Any]) -> None:
     _save_state(state)
 
 
+def _clear_skill_cache() -> None:
+    try:
+        from agent.prompt_builder import clear_skills_system_prompt_cache
+        clear_skills_system_prompt_cache(clear_snapshot=True)
+    except Exception:
+        pass
+
+
 def _hub_by_name() -> Dict[str, Dict[str, Any]]:
     try:
         from tools.skills_hub import HubLockFile
@@ -293,6 +301,7 @@ async def delete_skill(action: SkillAction) -> Dict[str, Any]:
             raise HTTPException(status_code=404, detail="技能路径不存在")
         shutil.rmtree(target)
 
+    _clear_skill_cache()
     _history({"action": "delete", "source": row["source"], "name": row["name"]})
     return {"ok": True, "skill": row}
 
