@@ -1,0 +1,9 @@
+name: skill-vault
+version: 0.1.0
+description: "CLI plugin for managing installed Hermes skills by source: builtin, hub, local, and the official optional catalog. Supports source-aware listing, physical deletion, and restore/install flows."
+author: Hermes Agent
+kind: standalone
+platforms:
+  - macos
+  - linux
+  - windows
