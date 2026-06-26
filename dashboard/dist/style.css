@@ -145,7 +145,7 @@
 
 .sm-toolbar {
   display: grid;
-  grid-template-columns: minmax(340px, .9fr) minmax(240px, 1fr) minmax(170px, 240px) auto auto;
+  grid-template-columns: minmax(300px, .9fr) minmax(220px, 1fr) minmax(150px, 220px) auto auto auto;
   gap: .55rem;
   align-items: center;
   border: 1px solid var(--sm-border);
@@ -179,6 +179,34 @@
   font-size: .75rem;
   text-align: right;
   white-space: nowrap;
+}
+
+.sm-toggle {
+  display: inline-flex;
+  min-height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  gap: .45rem;
+  border: 1px solid var(--sm-border);
+  background: rgba(0, 0, 0, .12);
+  color: var(--sm-muted);
+  padding: 0 .65rem;
+  font-size: .75rem;
+  white-space: nowrap;
+}
+
+.sm-toggle input {
+  width: .9rem;
+  height: .9rem;
+  margin: 0;
+  accent-color: var(--sm-text);
+}
+
+.sm-toggle code {
+  color: var(--sm-text);
+  font-family: var(--font-mono, var(--theme-font-mono, ui-monospace, monospace));
+  font-size: .72rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .sm-btn {
@@ -361,6 +389,12 @@
 .sm-pill--disabled {
   color: #fca5a5;
   border-color: rgba(252, 165, 165, .42);
+}
+
+.sm-pill--deleted {
+  color: #c4b5fd;
+  border-color: rgba(196, 181, 253, .42);
+  background: rgba(109, 40, 217, .1);
 }
 
 .sm-actions {

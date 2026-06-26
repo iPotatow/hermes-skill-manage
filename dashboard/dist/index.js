@@ -167,6 +167,15 @@
         return h("option", { key: category, value: category }, category === "all" ? "all categories" : category);
       })),
       h("span", { className: "sm-result-count" }, props.filtered + " / " + props.total),
+      h("label", { className: "sm-toggle", title: "默认隐藏；开启后显示可恢复的已删除内建技能" },
+        h("input", {
+          type: "checkbox",
+          checked: props.showMissingBuiltin,
+          onChange: function (e) { props.setShowMissingBuiltin(e.target.checked); },
+        }),
+        h("span", null, "显示已删除内建"),
+        h("code", null, props.missingBuiltinCount || 0)
+      ),
       h(Button, { onClick: props.onRefresh, disabled: props.loading }, props.loading ? "刷新中" : "刷新")
     );
   }
@@ -189,6 +198,10 @@
       }
       if (action === "update") {
         props.onAction("/update", { source: row.kind, name: row.name }, "已更新：" + row.name);
+        return;
+      }
+      if (action === "restore") {
+        props.onAction("/restore", { source: "builtin", name: row.name }, "已恢复：" + row.name);
       }
     }
 
@@ -208,6 +221,7 @@
         h("tbody", null,
           props.rows.map(function (row) {
             const busy = props.busyKey === row.kind + ":" + row.name;
+            const deleted = row.status === "deleted";
             return h("tr", { key: row.kind + ":" + row.name },
               h("td", { className: "sm-name", title: row.installPath },
                 h("strong", null, row.name),
@@ -216,12 +230,13 @@
               h("td", { className: "sm-dim" }, row.category || ""),
               h("td", null, h(Pill, { tone: row.kind, title: row.kind }, row.source)),
               h("td", { className: "sm-dim" }, row.trustLevel || "-"),
-              h("td", null, h(Pill, { tone: row.status === "enabled" ? "enabled" : "disabled" }, row.status || "enabled")),
+              h("td", null, h(Pill, { tone: deleted ? "deleted" : row.status === "enabled" ? "enabled" : "disabled" }, row.status || "enabled")),
               h("td", { className: "sm-actions" },
-                row.kind === "builtin" ? h(Button, { disabled: busy, onClick: function () { run(row, "reset"); } }, "重置") : null,
-                row.kind === "hub-installed" ? h(Button, { disabled: busy, onClick: function () { run(row, "reset"); } }, "重置") : null,
-                row.kind === "hub-installed" ? h(Button, { disabled: busy, onClick: function () { run(row, "update"); } }, "更新") : null,
-                h(Button, { kind: "danger", disabled: busy, onClick: function () { run(row, "delete"); } }, "删除")
+                deleted ? h(Button, { disabled: busy, onClick: function () { run(row, "restore"); } }, "恢复") : null,
+                !deleted && row.kind === "builtin" ? h(Button, { disabled: busy, onClick: function () { run(row, "reset"); } }, "重置") : null,
+                !deleted && row.kind === "hub-installed" ? h(Button, { disabled: busy, onClick: function () { run(row, "reset"); } }, "重置") : null,
+                !deleted && row.kind === "hub-installed" ? h(Button, { disabled: busy, onClick: function () { run(row, "update"); } }, "更新") : null,
+                !deleted ? h(Button, { kind: "danger", disabled: busy, onClick: function () { run(row, "delete"); } }, "删除") : null
               )
             );
           })
@@ -315,6 +330,7 @@
     const [toast, setToast] = useState(null);
     const [busyKey, setBusyKey] = useState("");
     const [installBusy, setInstallBusy] = useState(false);
+    const [showMissingBuiltin, setShowMissingBuiltin] = useState(false);
 
     const load = useCallback(function () {
       setLoading(true);
@@ -351,10 +367,16 @@
     }
 
     const rawRows = data && data.skills ? data.skills : [];
-    const rows = useMemo(function () { return normalizeRows(rawRows); }, [rawRows]);
-    const counts = useMemo(function () { return countRows(rows); }, [rows]);
-    const enabledCount = rows.filter(function (row) { return row.status !== "disabled"; }).length;
-    const disabledCount = rows.length - enabledCount;
+    const rawMissingBuiltin = data && data.missingBuiltinSkills ? data.missingBuiltinSkills : [];
+    const installedRows = useMemo(function () { return normalizeRows(rawRows); }, [rawRows]);
+    const missingBuiltinRows = useMemo(function () { return normalizeRows(rawMissingBuiltin); }, [rawMissingBuiltin]);
+    const rows = useMemo(function () {
+      return showMissingBuiltin ? installedRows.concat(missingBuiltinRows) : installedRows;
+    }, [installedRows, missingBuiltinRows, showMissingBuiltin]);
+    const counts = useMemo(function () { return countRows(installedRows); }, [installedRows]);
+    const sourceCounts = useMemo(function () { return countRows(rows); }, [rows]);
+    const enabledCount = installedRows.filter(function (row) { return row.status !== "disabled"; }).length;
+    const disabledCount = installedRows.length - enabledCount;
     const categories = useMemo(function () {
       const set = new Set(["all"]);
       rows.forEach(function (row) { set.add(row.category || "(root)"); });
@@ -378,7 +400,7 @@
         h("div", null,
           h("p", { className: "sm-kicker" }, data && data.meta ? data.meta.skillsDir : "Hermes 技能目录"),
           h("h1", null, "技能管理"),
-          h("p", null, "按来源管理 Hermes 技能，保留 Hermes skills list 的清单结构。")
+          h("p", null, "按来源管理 Hermes 技能；已删除的内建技能默认隐藏，可按需显示并恢复。")
         ),
         h(StatStrip, { counts: counts, enabled: enabledCount })
       ),
@@ -388,12 +410,15 @@
           setQuery: setQuery,
           source: source,
           setSource: setSource,
-          counts: counts,
+          counts: sourceCounts,
           category: category,
           setCategory: setCategory,
           categories: categories,
           total: rows.length,
           filtered: filtered.length,
+          showMissingBuiltin: showMissingBuiltin,
+          setShowMissingBuiltin: setShowMissingBuiltin,
+          missingBuiltinCount: data ? data.missingBuiltinCount : 0,
           loading: loading,
           onRefresh: load,
         }),

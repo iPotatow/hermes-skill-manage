@@ -9,7 +9,7 @@ import json
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 try:
     from fastapi import APIRouter, HTTPException
@@ -59,6 +59,65 @@ BUILTIN_DESCRIPTIONS: Dict[str, str] = {
     "spike": "用途：用一次性实验验证想法是否可行。主要功能：拆分 2-5 个可验证问题，做必要研究，构建可运行原型，记录 VALIDATED/PARTIAL/INVALIDATED 结论。依赖要求：未发现固定外部依赖；具体实验可能需要相应库、工具或网络资料。适用场景：不确定方案、比较技术路线、正式实现前验证风险。",
     "systematic-debugging": "用途：用四阶段流程定位技术问题根因。主要功能：建立可复现反馈环、读取错误、检查变更、收集证据、分析模式、形成可证伪假设、修复并验证。依赖要求：未发现固定外部依赖；通常需要能运行相关测试、命令或复现脚本。适用场景：测试失败、生产 Bug、构建失败、性能问题和多次修复无效的故障。",
     "test-driven-development": "用途：用 TDD 约束功能、修复和重构。主要功能：先写失败测试、确认 RED、写最小实现、确认 GREEN、再重构，并避免一次性横向堆测试。依赖要求：未发现固定外部依赖；需要项目具备可运行的自动化测试环境。适用场景：新增功能、Bug 修复、行为变更和需要高信心重构的开发工作。",
+}
+
+BUILTIN_DESCRIPTION_HINTS: Dict[str, str] = {
+    "airtable": "通过 Airtable REST API 管理记录，支持增删改查、筛选和 upsert。",
+    "apple-notes": "通过 memo CLI 管理 Apple Notes，支持创建、搜索和编辑笔记。",
+    "apple-reminders": "通过 remindctl 管理 Apple Reminders，支持添加、列出和完成提醒。",
+    "architecture-diagram": "生成深色主题 SVG/HTML 架构、云和基础设施图。",
+    "arxiv": "按关键词、作者、分类或 ID 搜索 arXiv 论文。",
+    "ascii-art": "使用 pyfiglet、cowsay、boxes 或图片转换生成 ASCII 艺术。",
+    "ascii-video": "把视频或音频转换成彩色 ASCII MP4/GIF。",
+    "audiocraft-audio-generation": "使用 AudioCraft 的 MusicGen 和 AudioGen 生成音乐或音效。",
+    "blogwatcher": "通过 blogwatcher-cli 监控博客和 RSS/Atom 订阅源。",
+    "claude-code": "把功能开发和 PR 编码任务委托给 Claude Code CLI。",
+    "claude-design": "设计一次性 HTML 产物，例如落地页、演示稿和原型。",
+    "codebase-inspection": "通过 pygount 检查代码库行数、语言和比例。",
+    "codex": "把功能开发和 PR 编码任务委托给 OpenAI Codex CLI。",
+    "comfyui": "使用 ComfyUI 生成图片、视频和音频，并管理节点、模型和工作流。",
+    "design-md": "编写、校验和导出 Google DESIGN.md token 规范文件。",
+    "evaluating-llms-harness": "使用 lm-eval-harness 对 LLM 运行 MMLU、GSM8K 等基准评测。",
+    "excalidraw": "生成手绘风格 Excalidraw JSON 架构图、流程图和序列图。",
+    "findmy": "在 macOS 上通过 FindMy.app 跟踪 Apple 设备和 AirTag。",
+    "gif-search": "通过 Tenor、curl 和 jq 搜索或下载 GIF。",
+    "google-workspace": "通过 gws CLI 或 Python 操作 Gmail、Calendar、Drive、Docs 和 Sheets。",
+    "heartmula": "根据歌词和标签用 HeartMuLa 生成歌曲。",
+    "himalaya": "通过 Himalaya CLI 使用 IMAP/SMTP 收发和管理邮件。",
+    "huggingface-hub": "通过 Hugging Face hf CLI 搜索、下载和上传模型或数据集。",
+    "humanizer": "改写文本，去除 AI 腔并加入更自然的表达。",
+    "imessage": "在 macOS 上通过 imsg CLI 发送和接收 iMessage/SMS。",
+    "jupyter-live-kernel": "通过实时 Jupyter kernel 持续迭代 Python 代码。",
+    "llama-cpp": "使用 llama.cpp 运行本地 GGUF 推理并发现 Hugging Face 模型。",
+    "llm-wiki": "构建和查询互联 Markdown 知识库。",
+    "manim-video": "用 Manim CE 制作数学、算法和讲解动画。",
+    "maps": "通过 OpenStreetMap/OSRM 查询地理编码、POI、路线和时区。",
+    "nano-pdf": "通过 nano-pdf CLI 用自然语言修改 PDF 文本、错别字和标题。",
+    "node-inspect-debugger": "通过 --inspect 和 Chrome DevTools Protocol CLI 调试 Node.js。",
+    "notion": "通过 Notion API 和 ntn CLI 管理页面、数据库、Markdown 和 Workers。",
+    "ocr-and-documents": "使用 pymupdf、marker-pdf 等从 PDF 或扫描件提取文本。",
+    "opencode": "把功能开发和 PR Review 委托给 OpenCode CLI。",
+    "openhue": "通过 OpenHue CLI 控制 Philips Hue 灯、场景和房间。",
+    "p5js": "创作 p5.js 生成艺术、shader、交互、3D 和浏览器视觉作品。",
+    "petdex": "安装和选择 Hermes 动画 petdex mascots。",
+    "polymarket": "查询 Polymarket 市场、价格、订单簿和历史数据。",
+    "popular-web-designs": "参考 54 个真实设计系统的 HTML/CSS 风格样例。",
+    "powerpoint": "创建、读取和编辑 .pptx 幻灯片、备注和模板。",
+    "pretext": "用 @chenglou/pretext 构建文字布局、ASCII 艺术和动态排版浏览器 demo。",
+    "python-debugpy": "通过 pdb REPL 和 debugpy 远程 DAP 调试 Python。",
+    "requesting-code-review": "执行提交前代码审查、安全扫描、质量门禁和自动修复。",
+    "research-paper-writing": "辅助撰写面向 NeurIPS、ICML、ICLR 的机器学习论文。",
+    "segment-anything-model": "使用 SAM 通过点、框和 mask 做零样本图像分割。",
+    "serving-llms-vllm": "使用 vLLM 部署高吞吐 LLM 服务、OpenAI API 和量化推理。",
+    "sketch": "快速制作 2-3 个一次性 HTML 设计草图用于比较。",
+    "songsee": "通过 CLI 分析音频频谱和 mel、chroma、MFCC 等特征。",
+    "songwriting-and-ai-music": "辅助歌曲创作和 Suno AI 音乐提示词编写。",
+    "teams-meeting-pipeline": "通过 Hermes CLI 操作 Teams 会议摘要流水线和 Microsoft Graph 订阅。",
+    "touchdesigner-mcp": "通过 twozero MCP 控制 TouchDesigner，创建 operator、连线和实时视觉。",
+    "weights-and-biases": "使用 W&B 记录机器学习实验、sweeps、模型注册和仪表盘。",
+    "xurl": "通过 xurl CLI 操作 X/Twitter 发帖、搜索、私信、媒体和 v2 API。",
+    "youtube-content": "把 YouTube 字幕转换成摘要、线程和博客内容。",
+    "yuanbao": "操作元宝群组，支持 @mention 用户以及查询信息和成员。",
 }
 
 
@@ -138,6 +197,19 @@ def _builtin_names() -> set[str]:
         return set()
 
 
+def _bundled_skills() -> List[Tuple[str, Path, str]]:
+    try:
+        from tools.skills_sync import _compute_relative_dest, _discover_bundled_skills, _get_bundled_dir
+        bundled_dir = _get_bundled_dir()
+        rows = []
+        for name, skill_dir in _discover_bundled_skills(bundled_dir):
+            install_path = _compute_relative_dest(skill_dir, bundled_dir).relative_to(_skills_dir()).as_posix()
+            rows.append((name, skill_dir, install_path))
+        return rows
+    except Exception:
+        return []
+
+
 def _disabled_names() -> set[str]:
     try:
         from agent.skill_utils import get_disabled_skill_names
@@ -152,6 +224,26 @@ def _all_skills() -> List[Dict[str, Any]]:
         return list(_find_all_skills(skip_disabled=True))
     except Exception:
         return []
+
+
+def _read_skill_description(skill_dir: Path) -> str:
+    try:
+        from tools.skills_tool import _parse_frontmatter
+        content = (skill_dir / "SKILL.md").read_text(encoding="utf-8")
+        frontmatter, _body = _parse_frontmatter(content)
+        return str(frontmatter.get("description", "") or "")
+    except Exception:
+        return ""
+
+
+def _builtin_description(name: str, fallback: str = "") -> str:
+    if name in BUILTIN_DESCRIPTIONS:
+        return BUILTIN_DESCRIPTIONS[name]
+    if name in BUILTIN_DESCRIPTION_HINTS:
+        return f"用途：{BUILTIN_DESCRIPTION_HINTS[name]}主要功能：见 bundled SKILL.md 文档。依赖要求：未在简介中发现明确依赖；具体以该技能文档为准。适用场景：{BUILTIN_DESCRIPTION_HINTS[name]}"
+    if fallback:
+        return f"用途：{fallback} 主要功能：见 bundled SKILL.md 文档。依赖要求：未在简介中发现明确依赖；具体以该技能文档为准。适用场景：需要使用该内建技能能力时。"
+    return "用途：内建 Hermes 技能。主要功能：见 bundled SKILL.md 文档。依赖要求：未发现明显依赖。适用场景：需要恢复并使用该内建技能时。"
 
 
 def _safe_target(rel_path: str) -> Path:
@@ -205,7 +297,7 @@ def _skill_row(skill: Dict[str, Any], hub: Dict[str, Dict[str, Any]], builtin: s
 
     description = skill.get("description", "") or ""
     if kind == "builtin":
-        description = BUILTIN_DESCRIPTIONS.get(name, description)
+        description = _builtin_description(name, description)
 
     return {
         "name": name,
@@ -231,11 +323,47 @@ def _inventory_rows() -> List[Dict[str, Any]]:
     return sorted(rows, key=lambda row: (row.get("category") or "", row["name"]))
 
 
+def _missing_builtin_rows(current_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    current_names = {row["name"] for row in current_rows}
+    rows: List[Dict[str, Any]] = []
+    for name, skill_dir, install_path in _bundled_skills():
+        if name in current_names:
+            continue
+        category = str(Path(install_path).parent)
+        if category == ".":
+            category = ""
+        description = _builtin_description(name, _read_skill_description(skill_dir))
+        rows.append({
+            "name": name,
+            "category": category,
+            "kind": "builtin",
+            "source": "builtin",
+            "rawSource": "builtin",
+            "trustLevel": "builtin",
+            "status": "deleted",
+            "installPath": install_path,
+            "identifier": f"bundled/{install_path}",
+            "description": description,
+            "installedAt": "",
+            "updatedAt": "",
+            "canRestore": True,
+        })
+    return sorted(rows, key=lambda row: (row.get("category") or "", row["name"]))
+
+
 def _find_skill(source: str, name: str) -> Dict[str, Any]:
     for row in _inventory_rows():
         if (row.get("kind") or row["source"]) == source and row["name"] == name:
             return row
     raise HTTPException(status_code=404, detail=f"未找到技能：{source}:{name}")
+
+
+def _find_missing_builtin(name: str) -> Dict[str, Any]:
+    rows = _inventory_rows()
+    for row in _missing_builtin_rows(rows):
+        if row["name"] == name:
+            return row
+    raise HTTPException(status_code=404, detail=f"未找到可恢复的内建技能：{name}")
 
 
 def _require_confirm(action: SkillAction, name: str) -> None:
@@ -273,6 +401,7 @@ def _optional_catalog(limit: int = 80) -> List[Dict[str, Any]]:
 @router.get("/inventory")
 async def inventory() -> Dict[str, Any]:
     rows = _inventory_rows()
+    missing_builtin = _missing_builtin_rows(rows)
     counts: Dict[str, int] = {}
     enabled_count = 0
     disabled_count = 0
@@ -289,7 +418,9 @@ async def inventory() -> Dict[str, Any]:
     return {
         "ok": True,
         "skills": rows,
+        "missingBuiltinSkills": missing_builtin,
         "counts": counts,
+        "missingBuiltinCount": len(missing_builtin),
         "enabledCount": enabled_count,
         "disabledCount": disabled_count,
         "categories": categories,
@@ -356,6 +487,21 @@ async def reset_skill(action: SkillAction) -> Dict[str, Any]:
 
     _history({"action": "reset", "source": row.get("kind", row["source"]), "name": row["name"]})
     return {"ok": True, "skill": row}
+
+
+@router.post("/restore")
+async def restore_builtin(action: SkillAction) -> Dict[str, Any]:
+    row = _find_missing_builtin(action.name)
+    try:
+        from tools.skills_sync import reset_bundled_skill
+        result = reset_bundled_skill(row["name"], restore=True)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    if not result.get("ok"):
+        raise HTTPException(status_code=500, detail=result.get("message", "恢复内建技能失败"))
+    _clear_skill_cache()
+    _history({"action": "restore", "source": "builtin", "name": row["name"]})
+    return {"ok": True, "skill": row, "result": result}
 
 
 @router.post("/update")
