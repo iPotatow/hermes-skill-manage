@@ -1,0 +1,14 @@
+{
+  "name": "skill-manage",
+  "label": "Skill manage（技能管理）",
+  "description": "按来源管理 Hermes 技能清单与生命周期。",
+  "icon": "Archive",
+  "version": "0.3.0",
+  "tab": {
+    "path": "/skill-manage",
+    "position": "after:skills"
+  },
+  "entry": "dist/index.js",
+  "css": "dist/style.css",
+  "api": "plugin_api.py"
+}

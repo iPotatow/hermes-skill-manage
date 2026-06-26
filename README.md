@@ -1,94 +1,53 @@
-# Hermes Skill Vault
+# Skill manage（技能管理）
 
-**Hermes Skill Vault** is a Hermes plugin for managing installed skills by source.
-It groups skills into four source-aware views and supports:
+`Skill manage（技能管理）` 是 Hermes Dashboard 插件，用来按来源查看和管理
+`~/.hermes/skills` 下的技能。
 
-- **builtin** skills
-- **hub** skills
-- **local** skills
-- **optional** official catalog skills
+## 功能
 
-It also supports:
+- 按来源统计和筛选技能：`builtin`、`skills.sh`、`clawhub`、`local`
+- 按分类目录筛选技能
+- 搜索技能名称、路径、描述和来源标识
+- 查看技能详情、`SKILL.md` 内容和文件列表
+- 删除非内置技能，并自动备份到插件的 `trash/` 目录
+- 从删除备份恢复技能
+- 从 hub、URL、仓库或 optional catalog 安装技能
 
-- **physical delete** with a local backup
-- **restore** from backup or source
-- **install** flows for builtin, hub, and optional skills
-
-> Note: this repo is the plugin implementation, not a skill itself.
-
-## Why this exists
-
-Hermes already has strong skill lifecycle primitives. Skill Vault adds a thinner
-operator-facing layer so you can inspect, manage, delete, restore, and install
-skills without digging through separate commands.
-
-## Features
-
-### 1) Source-aware inventory
-
-List skills by source:
-
-- `builtin`
-- `hub`
-- `local`
-- `optional`
-
-### 2) Physical deletion
-
-Delete an installed skill from disk, while keeping a backup in the plugin's own
-trash area for recovery.
-
-### 3) Restore
-
-Restore a deleted skill from the backup copy. For builtin skills, restore uses
-the bundled reset path.
-
-### 4) Install
-
-Install or reinstall from these sources:
-
-- builtin
-- hub
-- optional official catalog
-
-## Example commands
-
-```bash
-hermes skill-vault list
-hermes skill-vault list --source builtin
-hermes skill-vault delete --source local my-skill
-hermes skill-vault restore --source local my-skill
-hermes skill-vault install optional official/mlops/training/trl-fine-tuning
-```
-
-## Repository structure
+## Dashboard 文件
 
 ```text
-skill-vault/
-├── __init__.py
-├── cli.py
-├── plugin.yaml
-└── README.md
+~/.hermes/plugins/skill-vault/
+└── dashboard/
+    ├── manifest.json
+    ├── plugin_api.py
+    └── dist/
+        ├── index.js
+        └── style.css
 ```
 
-## Installation
+启动 Dashboard：
 
-If you are working inside the Hermes profile that has this plugin installed:
+```bash
+hermes dashboard --port 9119
+```
 
-1. Copy the plugin into `~/.hermes/plugins/skill-vault/`
-2. Add it to your Hermes plugin config if needed
-3. Restart Hermes / reload plugins
+如果只修改了前端静态文件，可以让 Dashboard 重新扫描：
 
-## Development
+```bash
+curl http://127.0.0.1:9119/api/dashboard/plugins/rescan
+```
 
-This plugin is intentionally thin and reuses Hermes' existing skill lifecycle
-helpers where possible.
+如果修改了 `dashboard/plugin_api.py`，需要重启 Dashboard，后端路由才会重新挂载。
 
-If you extend it, keep the operations source-aware and keep destructive actions
-backed by a recoverable backup path.
+## 安全策略
 
-## Name
+- `builtin` 技能在当前 Dashboard 版本中禁止删除。
+- 删除操作必须输入完整技能名确认。
+- 非内置技能删除前会复制到 `trash/`，可在 Dashboard 中恢复。
+- 所有技能路径都会校验在 `~/.hermes/skills` 内，避免路径逃逸。
 
-- **Human name:** Hermes Skill Vault
-- **GitHub repo:** `hermes-skill-vault`
-- **Plugin id:** `skill-vault`
+## 名称
+
+- Dashboard 名称：`Skill manage（技能管理）`
+- Dashboard 插件 ID：`skill-manage`
+- 安装目录：`~/.hermes/plugins/skill-vault`
