@@ -74,9 +74,11 @@
   }
 
   function normalizeSource(row) {
+    const kind = String(row.kind || "").toLowerCase();
     const source = String(row.source || "").toLowerCase();
     const trust = String(row.trustLevel || row.trust || "").toLowerCase();
     const raw = String(row.rawSource || row.source || "").toLowerCase();
+    if (kind) return kind;
     if (source === "builtin") return "builtin";
     if (source === "local" && trust === "local") return "local";
     if (source === "hub-installed") return "hub-installed";
@@ -87,11 +89,15 @@
 
   function normalizeRows(rows) {
     return rows.map(function (row) {
-      const source = normalizeSource(row);
+      const kind = normalizeSource(row);
+      const displaySource = row.source === "hub-installed"
+        ? (row.rawSource || "hub")
+        : (row.source || row.rawSource || kind);
       return Object.assign({}, row, {
-        source: source,
-        rawSource: row.rawSource || row.source || source,
-        trustLevel: row.trustLevel || row.trust || (source === "hub-installed" ? "community" : source),
+        kind: kind,
+        source: displaySource,
+        rawSource: row.rawSource || displaySource,
+        trustLevel: row.trustLevel || row.trust || (kind === "hub-installed" ? "community" : kind),
         status: row.status || (row.enabled === false ? "disabled" : "enabled"),
       });
     });
@@ -99,7 +105,7 @@
 
   function countRows(rows) {
     return rows.reduce(function (acc, row) {
-      acc[row.source] = (acc[row.source] || 0) + 1;
+      acc[row.kind] = (acc[row.kind] || 0) + 1;
       return acc;
     }, {});
   }
@@ -181,15 +187,15 @@
       if (action === "delete") {
         const confirm = confirmName(row.name, "删除");
         if (!confirm) return;
-        props.onAction("/delete", { source: row.source, name: row.name, confirm: confirm }, "已删除：" + row.name);
+        props.onAction("/delete", { source: row.kind, name: row.name, confirm: confirm }, "已删除：" + row.name);
         return;
       }
       if (action === "reset") {
-        props.onAction("/reset", { source: row.source, name: row.name }, "已重置：" + row.name);
+        props.onAction("/reset", { source: row.kind, name: row.name }, "已重置：" + row.name);
         return;
       }
       if (action === "update") {
-        props.onAction("/update", { source: row.source, name: row.name }, "已更新：" + row.name);
+        props.onAction("/update", { source: row.kind, name: row.name }, "已更新：" + row.name);
       }
     }
 
@@ -208,17 +214,17 @@
         ),
         h("tbody", null,
           props.rows.map(function (row) {
-            const busy = props.busyKey === row.source + ":" + row.name;
-            return h("tr", { key: row.source + ":" + row.name },
+            const busy = props.busyKey === row.kind + ":" + row.name;
+            return h("tr", { key: row.kind + ":" + row.name },
               h("td", { className: "sm-name", title: row.installPath }, row.name),
               h("td", { className: "sm-dim" }, row.category || ""),
-              h("td", null, h(Pill, { tone: row.source, title: row.rawSource || row.source }, row.source)),
+              h("td", null, h(Pill, { tone: row.kind, title: row.kind }, row.source)),
               h("td", { className: "sm-dim" }, row.trustLevel || "-"),
               h("td", null, h(Pill, { tone: row.status === "enabled" ? "enabled" : "disabled" }, row.status || "enabled")),
               h("td", { className: "sm-actions" },
-                row.source === "builtin" ? h(Button, { disabled: busy, onClick: function () { run(row, "reset"); } }, "重置") : null,
-                row.source === "hub-installed" ? h(Button, { disabled: busy, onClick: function () { run(row, "reset"); } }, "重置") : null,
-                row.source === "hub-installed" ? h(Button, { disabled: busy, onClick: function () { run(row, "update"); } }, "更新") : null,
+                row.kind === "builtin" ? h(Button, { disabled: busy, onClick: function () { run(row, "reset"); } }, "重置") : null,
+                row.kind === "hub-installed" ? h(Button, { disabled: busy, onClick: function () { run(row, "reset"); } }, "重置") : null,
+                row.kind === "hub-installed" ? h(Button, { disabled: busy, onClick: function () { run(row, "update"); } }, "更新") : null,
                 h(Button, { kind: "danger", disabled: busy, onClick: function () { run(row, "delete"); } }, "删除")
               )
             );
@@ -362,10 +368,10 @@
     const filtered = useMemo(function () {
       const q = query.trim().toLowerCase();
       return rows.filter(function (row) {
-        if (source !== "all" && row.source !== source) return false;
+        if (source !== "all" && row.kind !== source) return false;
         if (category !== "all" && (row.category || "(root)") !== category) return false;
         if (!q) return true;
-        return [row.name, row.category, row.source, row.trustLevel, row.status, row.rawSource]
+        return [row.name, row.category, row.source, row.kind, row.trustLevel, row.status, row.rawSource]
           .join(" ").toLowerCase().indexOf(q) >= 0;
       });
     }, [rows, query, source, category]);

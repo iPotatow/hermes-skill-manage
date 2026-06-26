@@ -163,22 +163,22 @@ def _skill_row(skill: Dict[str, Any], hub: Dict[str, Dict[str, Any]], builtin: s
     install_path = _normalize_path(skill_md_path, name, category)
 
     if hub_entry:
-        source = "hub-installed"
-        raw_source = hub_entry.get("source", "hub")
+        kind = "hub-installed"
+        source = hub_entry.get("source", "hub")
         trust = hub_entry.get("trust_level", "community")
         identifier = hub_entry.get("identifier", "")
         installed_at = str(hub_entry.get("installed_at", ""))[:10]
         updated_at = str(hub_entry.get("updated_at", ""))[:10]
     elif name in builtin:
+        kind = "builtin"
         source = "builtin"
-        raw_source = "builtin"
         trust = "builtin"
         identifier = f"bundled/{install_path}"
         installed_at = ""
         updated_at = ""
     else:
+        kind = "local"
         source = "local"
-        raw_source = "local"
         trust = "local"
         identifier = ""
         installed_at = ""
@@ -187,9 +187,10 @@ def _skill_row(skill: Dict[str, Any], hub: Dict[str, Dict[str, Any]], builtin: s
     return {
         "name": name,
         "category": category,
+        "kind": kind,
         "source": source,
-        "rawSource": raw_source,
-        "trustLevel": "official" if raw_source == "official" else trust,
+        "rawSource": source,
+        "trustLevel": "official" if source == "official" else trust,
         "status": "disabled" if name in disabled else "enabled",
         "installPath": install_path,
         "identifier": identifier,
@@ -209,7 +210,7 @@ def _inventory_rows() -> List[Dict[str, Any]]:
 
 def _find_skill(source: str, name: str) -> Dict[str, Any]:
     for row in _inventory_rows():
-        if row["source"] == source and row["name"] == name:
+        if (row.get("kind") or row["source"]) == source and row["name"] == name:
             return row
     raise HTTPException(status_code=404, detail=f"未找到技能：{source}:{name}")
 
@@ -254,7 +255,8 @@ async def inventory() -> Dict[str, Any]:
     disabled_count = 0
     categories: Dict[str, int] = {}
     for row in rows:
-        counts[row["source"]] = counts.get(row["source"], 0) + 1
+        kind = row.get("kind") or row["source"]
+        counts[kind] = counts.get(kind, 0) + 1
         categories[row.get("category") or "(root)"] = categories.get(row.get("category") or "(root)", 0) + 1
         if row["status"] == "enabled":
             enabled_count += 1
@@ -285,7 +287,7 @@ async def delete_skill(action: SkillAction) -> Dict[str, Any]:
     _require_confirm(action, name)
     row = _find_skill(source, name)
 
-    if row["source"] == "hub-installed":
+    if row.get("kind") == "hub-installed":
         try:
             from tools.skills_hub import uninstall_skill
             ok, message = uninstall_skill(row["name"])
@@ -302,7 +304,7 @@ async def delete_skill(action: SkillAction) -> Dict[str, Any]:
         shutil.rmtree(target)
 
     _clear_skill_cache()
-    _history({"action": "delete", "source": row["source"], "name": row["name"]})
+    _history({"action": "delete", "source": row.get("kind", row["source"]), "name": row["name"]})
     return {"ok": True, "skill": row}
 
 
@@ -312,13 +314,13 @@ async def reset_skill(action: SkillAction) -> Dict[str, Any]:
     source = action.source
     row = _find_skill(source, name)
 
-    if row["source"] == "builtin":
+    if row.get("kind") == "builtin":
         try:
             from hermes_cli.skills_hub import do_reset
             do_reset(row["name"], restore=True, console=None, skip_confirm=True)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
-    elif row["source"] == "hub-installed":
+    elif row.get("kind") == "hub-installed":
         if not row.get("identifier"):
             raise HTTPException(status_code=400, detail="该 hub 技能缺少来源标识，无法重置")
         try:
@@ -329,7 +331,7 @@ async def reset_skill(action: SkillAction) -> Dict[str, Any]:
     else:
         raise HTTPException(status_code=400, detail="本地技能不支持重置")
 
-    _history({"action": "reset", "source": row["source"], "name": row["name"]})
+    _history({"action": "reset", "source": row.get("kind", row["source"]), "name": row["name"]})
     return {"ok": True, "skill": row}
 
 
@@ -341,7 +343,7 @@ async def update_skill(action: SkillAction) -> Dict[str, Any]:
         do_update(name=row["name"], console=None)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
-    _history({"action": "update", "source": row["source"], "name": row["name"]})
+    _history({"action": "update", "source": row.get("kind", row["source"]), "name": row["name"]})
     return {"ok": True, "skill": row}
 
 
