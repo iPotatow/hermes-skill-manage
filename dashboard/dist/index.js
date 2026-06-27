@@ -229,8 +229,6 @@
       h(SourceTabs, {
         source: props.source,
         setSource: props.setSource,
-        counts: props.counts,
-        total: props.total,
         text: props.text,
       }),
       h("select", {
@@ -273,7 +271,7 @@
 
     function onKeyDown(e) {
       if (e.key === "Escape") {
-        props.onCancel();
+        if (!props.busy) props.onCancel();
         return;
       }
       if (e.key === "Enter" && canConfirm) {
@@ -357,7 +355,7 @@
             h("th", null, props.text.columns.source),
             h("th", null, props.text.columns.trust),
             h("th", null, props.text.columns.status),
-            h("th", null, props.text.columns.actions)
+            h("th", { className: "sm-actions-head" }, props.text.columns.actions)
           )
         ),
         h("tbody", null,
@@ -374,12 +372,14 @@
               h("td", null, h(Pill, { tone: row.kind, title: row.kind }, row.source)),
               h("td", { className: "sm-dim" }, row.trustLevel || "-"),
               h("td", null, h(Pill, { tone: deleted ? "deleted" : row.status === "enabled" ? "enabled" : "disabled" }, row.status || "enabled")),
-              h("td", { className: "sm-actions" },
-                deleted ? h(Button, { disabled: busy, onClick: function () { run(row, "restore"); } }, props.text.actions.restore) : null,
-                !deleted && row.kind === "builtin" ? h(Button, { disabled: busy, onClick: function () { run(row, "reset"); } }, props.text.actions.reset) : null,
-                !deleted && row.kind === "hub-installed" ? h(Button, { disabled: busy, onClick: function () { run(row, "reset"); } }, props.text.actions.reset) : null,
-                !deleted && row.kind === "hub-installed" ? h(Button, { disabled: busy, onClick: function () { run(row, "update"); } }, props.text.actions.update) : null,
-                !deleted ? h(Button, { kind: "danger", disabled: busy, onClick: function () { run(row, "delete"); } }, props.text.actions.delete) : null
+              h("td", { className: "sm-actions-cell" },
+                h("div", { className: "sm-actions" },
+                  deleted ? h(Button, { disabled: busy, onClick: function () { run(row, "restore"); } }, props.text.actions.restore) : null,
+                  !deleted && row.kind === "builtin" ? h(Button, { disabled: busy, onClick: function () { run(row, "reset"); } }, props.text.actions.reset) : null,
+                  !deleted && row.kind === "hub-installed" ? h(Button, { disabled: busy, onClick: function () { run(row, "reset"); } }, props.text.actions.reset) : null,
+                  !deleted && row.kind === "hub-installed" ? h(Button, { disabled: busy, onClick: function () { run(row, "update"); } }, props.text.actions.update) : null,
+                  !deleted ? h(Button, { kind: "danger", disabled: busy, onClick: function () { run(row, "delete"); } }, props.text.actions.delete) : null
+                )
               )
             );
           })
@@ -482,9 +482,7 @@
       return next;
     }, [installedRows, missingBuiltinRows, showMissingBuiltin]);
     const counts = useMemo(function () { return countRows(installedRows); }, [installedRows]);
-    const sourceCounts = useMemo(function () { return countRows(rows); }, [rows]);
     const enabledCount = installedRows.filter(function (row) { return row.status !== "disabled"; }).length;
-    const disabledCount = installedRows.length - enabledCount;
     const categories = useMemo(function () {
       const set = new Set(["all"]);
       rows.forEach(function (row) { set.add(row.category || "(root)"); });
@@ -517,7 +515,6 @@
           setQuery: setQuery,
           source: source,
           setSource: setSource,
-          counts: sourceCounts,
           category: category,
           setCategory: setCategory,
           categories: categories,

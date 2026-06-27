@@ -307,7 +307,7 @@
   border-bottom: 1px solid color-mix(in srgb, var(--sm-border) 70%, transparent);
   padding: .72rem .8rem;
   text-align: left;
-  vertical-align: middle;
+  vertical-align: top;
 }
 
 .sm-table th {
@@ -317,6 +317,11 @@
 
 .sm-table tbody tr:hover {
   background: color-mix(in srgb, var(--color-primary, #ffe6cb) 7%, transparent);
+}
+
+.sm-actions-head,
+.sm-actions-cell {
+  text-align: right !important;
 }
 
 .sm-name {
@@ -405,8 +410,9 @@
 }
 
 .sm-actions {
-  display: flex;
+  display: inline-flex;
   justify-content: flex-end;
+  align-items: center;
   gap: .4rem;
   min-width: 12rem;
   white-space: nowrap;
