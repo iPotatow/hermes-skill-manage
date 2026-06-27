@@ -21,16 +21,18 @@
   const CardContent = C.CardContent || function (props) { return h("div", props, props.children); };
 
   const API = "/api/plugins/skill-manage";
-  const SOURCE_ORDER = ["all", "builtin", "hub-installed", "local"];
+  const SOURCE_ORDER = ["all", "builtin", "hub-installed", "local", "orphaned-builtin"];
   const TEXT = {
     en: {
       unknownError: "Unknown error",
-      sourceLabels: { all: "All skills", builtin: "Built-in", "hub-installed": "Hub installed", local: "Local" },
+      sourceLabels: { all: "All skills", builtin: "Built-in", "hub-installed": "Hub installed", local: "Local", "orphaned-builtin": "Removed upstream" },
       stats: { "hub-installed": "Hub installed", builtin: "Built-in", local: "Local", enabled: "Enabled" },
       searchPlaceholder: "Search Name / Category / Source",
       allCategories: "all categories",
       showDeletedBuiltin: "Show deleted built-ins",
       showDeletedBuiltinTitle: "Hidden by default; enable to show built-in skills that can be restored from the Hermes bundled source.",
+      showOrphanedBuiltin: "Show removed upstream",
+      showOrphanedBuiltinTitle: "Hidden by default; enable to show local skills that were previously bundled but no longer exist in the current Hermes bundled source.",
       refresh: "Refresh",
       refreshing: "Refreshing",
       empty: "No matching skills",
@@ -48,7 +50,7 @@
       },
       heroKickerFallback: "Hermes skills directory",
       title: "Skill Manage",
-      subtitle: "Manage Hermes skills by source; deleted built-in skills are hidden by default and can be shown when you need to restore them.",
+      subtitle: "Manage Hermes skills by source; deleted and removed-upstream built-ins are hidden by default and can be shown when needed.",
       installTitle: "Install skill",
       installHint: "Supports URL, owner/repo, hub identifier, or optional catalog path.",
       targetPlaceholder: "identifier / URL / owner/repo",
@@ -59,12 +61,14 @@
     },
     zh: {
       unknownError: "未知错误",
-      sourceLabels: { all: "全部技能", builtin: "内建", "hub-installed": "Hub 安装", local: "本地" },
+      sourceLabels: { all: "全部技能", builtin: "内建", "hub-installed": "Hub 安装", local: "本地", "orphaned-builtin": "官方已移除" },
       stats: { "hub-installed": "Hub 安装", builtin: "内建", local: "本地", enabled: "启用" },
       searchPlaceholder: "搜索名称 / 分类 / 来源",
       allCategories: "全部分类",
       showDeletedBuiltin: "显示已删除内建",
       showDeletedBuiltinTitle: "默认隐藏；开启后显示可从 Hermes bundled 源恢复的内建技能。",
+      showOrphanedBuiltin: "显示官方已移除",
+      showOrphanedBuiltinTitle: "默认隐藏；开启后显示曾经是官方 bundled、但当前 Hermes 官方源已移除的本地残留技能。",
       refresh: "刷新",
       refreshing: "刷新中",
       empty: "没有匹配的技能",
@@ -82,7 +86,7 @@
       },
       heroKickerFallback: "Hermes 技能目录",
       title: "技能管理",
-      subtitle: "按来源管理 Hermes 技能；已删除的内建技能默认隐藏，可按需显示并恢复。",
+      subtitle: "按来源管理 Hermes 技能；已删除和官方已移除的内建技能默认隐藏，可按需显示。",
       installTitle: "安装技能",
       installHint: "支持 URL、owner/repo、hub 标识或 optional catalog 路径。",
       targetPlaceholder: "identifier / URL / owner/repo",
@@ -155,6 +159,7 @@
     const raw = String(row.rawSource || row.source || "").toLowerCase();
     if (kind) return kind;
     if (source === "builtin") return "builtin";
+    if (source === "orphaned-builtin") return "orphaned-builtin";
     if (source === "local" && trust === "local") return "local";
     if (source === "hub-installed") return "hub-installed";
     if (trust === "community" || trust === "official") return "hub-installed";
@@ -252,6 +257,15 @@
         h("span", null, props.text.showDeletedBuiltin),
         h("code", null, props.missingBuiltinCount || 0)
       ),
+      h("label", { className: "sm-toggle", title: props.text.showOrphanedBuiltinTitle },
+        h("input", {
+          type: "checkbox",
+          checked: props.showOrphanedBuiltin,
+          onChange: function (e) { props.setShowOrphanedBuiltin(e.target.checked); },
+        }),
+        h("span", null, props.text.showOrphanedBuiltin),
+        h("code", null, props.orphanedBuiltinCount || 0)
+      ),
       h(Button, { onClick: props.onRefresh, disabled: props.loading }, props.loading ? props.text.refreshing : props.text.refresh)
     );
   }
@@ -298,6 +312,7 @@
           props.rows.map(function (row) {
             const busy = props.busyKey === row.kind + ":" + row.name;
             const deleted = row.status === "deleted";
+            const deprecated = row.status === "deprecated";
             const description = props.lang === "zh" ? (row.descriptionZh || row.description) : (row.descriptionEn || row.description);
             return h("tr", { key: row.kind + ":" + row.name },
               h("td", { className: "sm-name", title: row.installPath },
@@ -307,7 +322,7 @@
               h("td", { className: "sm-dim" }, row.category || ""),
               h("td", null, h(Pill, { tone: row.kind, title: row.kind }, row.source)),
               h("td", { className: "sm-dim" }, row.trustLevel || "-"),
-              h("td", null, h(Pill, { tone: deleted ? "deleted" : row.status === "enabled" ? "enabled" : "disabled" }, row.status || "enabled")),
+              h("td", null, h(Pill, { tone: deleted ? "deleted" : deprecated ? "deprecated" : row.status === "enabled" ? "enabled" : "disabled" }, row.status || "enabled")),
               h("td", { className: "sm-actions" },
                 deleted ? h(Button, { disabled: busy, onClick: function () { run(row, "restore"); } }, props.text.actions.restore) : null,
                 !deleted && row.kind === "builtin" ? h(Button, { disabled: busy, onClick: function () { run(row, "reset"); } }, props.text.actions.reset) : null,
@@ -411,6 +426,7 @@
     const [busyKey, setBusyKey] = useState("");
     const [installBusy, setInstallBusy] = useState(false);
     const [showMissingBuiltin, setShowMissingBuiltin] = useState(false);
+    const [showOrphanedBuiltin, setShowOrphanedBuiltin] = useState(false);
 
     const load = useCallback(function () {
       setLoading(true);
@@ -448,11 +464,16 @@
 
     const rawRows = data && data.skills ? data.skills : [];
     const rawMissingBuiltin = data && data.missingBuiltinSkills ? data.missingBuiltinSkills : [];
+    const rawOrphanedBuiltin = data && data.orphanedBuiltinSkills ? data.orphanedBuiltinSkills : [];
     const installedRows = useMemo(function () { return normalizeRows(rawRows); }, [rawRows]);
     const missingBuiltinRows = useMemo(function () { return normalizeRows(rawMissingBuiltin); }, [rawMissingBuiltin]);
+    const orphanedBuiltinRows = useMemo(function () { return normalizeRows(rawOrphanedBuiltin); }, [rawOrphanedBuiltin]);
     const rows = useMemo(function () {
-      return showMissingBuiltin ? installedRows.concat(missingBuiltinRows) : installedRows;
-    }, [installedRows, missingBuiltinRows, showMissingBuiltin]);
+      let next = installedRows;
+      if (showMissingBuiltin) next = next.concat(missingBuiltinRows);
+      if (showOrphanedBuiltin) next = next.concat(orphanedBuiltinRows);
+      return next;
+    }, [installedRows, missingBuiltinRows, orphanedBuiltinRows, showMissingBuiltin, showOrphanedBuiltin]);
     const counts = useMemo(function () { return countRows(installedRows); }, [installedRows]);
     const sourceCounts = useMemo(function () { return countRows(rows); }, [rows]);
     const enabledCount = installedRows.filter(function (row) { return row.status !== "disabled"; }).length;
@@ -499,6 +520,9 @@
           showMissingBuiltin: showMissingBuiltin,
           setShowMissingBuiltin: setShowMissingBuiltin,
           missingBuiltinCount: data ? data.missingBuiltinCount : 0,
+          showOrphanedBuiltin: showOrphanedBuiltin,
+          setShowOrphanedBuiltin: setShowOrphanedBuiltin,
+          orphanedBuiltinCount: data ? data.orphanedBuiltinCount : 0,
           text: text,
           loading: loading,
           onRefresh: load,

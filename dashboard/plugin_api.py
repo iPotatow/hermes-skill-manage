@@ -174,8 +174,11 @@ def _load_state() -> Dict[str, Any]:
         data = {"version": 1, "history": []}
     data.setdefault("version", 1)
     data.setdefault("history", [])
+    data.setdefault("knownBundledSkills", {})
     if not isinstance(data["history"], list):
         data["history"] = []
+    if not isinstance(data["knownBundledSkills"], dict):
+        data["knownBundledSkills"] = {}
     return data
 
 
@@ -190,6 +193,33 @@ def _history(event: Dict[str, Any]) -> None:
     state.setdefault("history", []).insert(0, event)
     state["history"] = state["history"][:200]
     _save_state(state)
+
+
+def _record_known_bundled(state: Dict[str, Any], bundled: List[Tuple[str, Path, str]]) -> None:
+    known = state.setdefault("knownBundledSkills", {})
+    changed = False
+    for name, _skill_dir, install_path in bundled:
+        category = str(Path(install_path).parent)
+        if category == ".":
+            category = ""
+        existing = known.get(name)
+        next_value = {
+            "name": name,
+            "category": category,
+            "installPath": install_path,
+            "firstSeenAt": _now(),
+        }
+        if not isinstance(existing, dict):
+            known[name] = next_value
+            changed = True
+        else:
+            merged = dict(existing)
+            merged.update({key: value for key, value in next_value.items() if key != "firstSeenAt"})
+            if merged != existing:
+                known[name] = merged
+                changed = True
+    if changed:
+        _save_state(state)
 
 
 def _clear_skill_cache() -> None:
@@ -295,7 +325,7 @@ def _normalize_path(path_value: Any, name: str, category: str) -> str:
     return f"{category}/{name}" if category else name
 
 
-def _skill_row(skill: Dict[str, Any], hub: Dict[str, Dict[str, Any]], builtin: set[str], disabled: set[str]) -> Dict[str, Any]:
+def _skill_row(skill: Dict[str, Any], hub: Dict[str, Dict[str, Any]], builtin: set[str], disabled: set[str], bundled_names: set[str]) -> Dict[str, Any]:
     name = skill["name"]
     category = skill.get("category", "") or ""
     hub_entry = hub.get(name)
@@ -309,7 +339,7 @@ def _skill_row(skill: Dict[str, Any], hub: Dict[str, Dict[str, Any]], builtin: s
         identifier = hub_entry.get("identifier", "")
         installed_at = str(hub_entry.get("installed_at", ""))[:10]
         updated_at = str(hub_entry.get("updated_at", ""))[:10]
-    elif name in builtin:
+    elif name in builtin and name in bundled_names:
         kind = "builtin"
         source = "builtin"
         trust = "builtin"
@@ -348,12 +378,41 @@ def _skill_row(skill: Dict[str, Any], hub: Dict[str, Dict[str, Any]], builtin: s
     }
 
 
-def _inventory_rows() -> List[Dict[str, Any]]:
+def _inventory_rows(bundled_names: set[str]) -> List[Dict[str, Any]]:
     hub = _hub_by_name()
     builtin = _builtin_names()
     disabled = _disabled_names()
-    rows = [_skill_row(skill, hub, builtin, disabled) for skill in _all_skills()]
+    rows = [_skill_row(skill, hub, builtin, disabled, bundled_names) for skill in _all_skills()]
     return sorted(rows, key=lambda row: (row.get("category") or "", row["name"]))
+
+
+def _split_orphaned_builtin_rows(rows: List[Dict[str, Any]], bundled_names: set[str], state: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    known = state.get("knownBundledSkills", {})
+    if not isinstance(known, dict):
+        return rows, []
+    active: List[Dict[str, Any]] = []
+    orphaned: List[Dict[str, Any]] = []
+    for row in rows:
+        name = row["name"]
+        was_bundled = name in known
+        currently_bundled = name in bundled_names
+        if was_bundled and not currently_bundled and row.get("kind") in {"local", "builtin"}:
+            meta = known.get(name) if isinstance(known.get(name), dict) else {}
+            next_row = dict(row)
+            next_row.update({
+                "kind": "orphaned-builtin",
+                "source": "orphaned-builtin",
+                "rawSource": "orphaned-builtin",
+                "trustLevel": "deprecated",
+                "status": "deprecated",
+                "officialStatus": "removed-upstream",
+                "canRestore": False,
+                "previousBuiltinPath": meta.get("installPath", row.get("installPath", "")),
+            })
+            orphaned.append(next_row)
+        else:
+            active.append(row)
+    return active, sorted(orphaned, key=lambda row: (row.get("category") or "", row["name"]))
 
 
 def _missing_builtin_rows(current_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -388,14 +447,20 @@ def _missing_builtin_rows(current_rows: List[Dict[str, Any]]) -> List[Dict[str, 
 
 
 def _find_skill(source: str, name: str) -> Dict[str, Any]:
-    for row in _inventory_rows():
+    bundled = _bundled_skills()
+    bundled_names = {item[0] for item in bundled}
+    state = _load_state()
+    rows, orphaned = _split_orphaned_builtin_rows(_inventory_rows(bundled_names), bundled_names, state)
+    for row in rows + orphaned:
         if (row.get("kind") or row["source"]) == source and row["name"] == name:
             return row
     raise HTTPException(status_code=404, detail=f"未找到技能：{source}:{name}")
 
 
 def _find_missing_builtin(name: str) -> Dict[str, Any]:
-    rows = _inventory_rows()
+    bundled = _bundled_skills()
+    bundled_names = {item[0] for item in bundled}
+    rows = _inventory_rows(bundled_names)
     for row in _missing_builtin_rows(rows):
         if row["name"] == name:
             return row
@@ -436,7 +501,12 @@ def _optional_catalog(limit: int = 80) -> List[Dict[str, Any]]:
 
 @router.get("/inventory")
 async def inventory() -> Dict[str, Any]:
-    rows = _inventory_rows()
+    bundled = _bundled_skills()
+    bundled_names = {item[0] for item in bundled}
+    state = _load_state()
+    _record_known_bundled(state, bundled)
+    state = _load_state()
+    rows, orphaned_builtin = _split_orphaned_builtin_rows(_inventory_rows(bundled_names), bundled_names, state)
     missing_builtin = _missing_builtin_rows(rows)
     counts: Dict[str, int] = {}
     enabled_count = 0
@@ -450,13 +520,14 @@ async def inventory() -> Dict[str, Any]:
             enabled_count += 1
         else:
             disabled_count += 1
-    state = _load_state()
     return {
         "ok": True,
         "skills": rows,
         "missingBuiltinSkills": missing_builtin,
+        "orphanedBuiltinSkills": orphaned_builtin,
         "counts": counts,
         "missingBuiltinCount": len(missing_builtin),
+        "orphanedBuiltinCount": len(orphaned_builtin),
         "enabledCount": enabled_count,
         "disabledCount": disabled_count,
         "categories": categories,

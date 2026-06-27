@@ -145,7 +145,7 @@
 
 .sm-toolbar {
   display: grid;
-  grid-template-columns: minmax(300px, .9fr) minmax(220px, 1fr) minmax(150px, 220px) auto auto auto;
+  grid-template-columns: minmax(280px, .9fr) minmax(220px, 1fr) minmax(150px, 220px) auto auto auto auto;
   gap: .55rem;
   align-items: center;
   border: 1px solid var(--sm-border);
@@ -395,6 +395,13 @@
   color: #c4b5fd;
   border-color: rgba(196, 181, 253, .42);
   background: rgba(109, 40, 217, .1);
+}
+
+.sm-pill--deprecated,
+.sm-pill--orphaned-builtin {
+  color: #fdba74;
+  border-color: rgba(251, 146, 60, .42);
+  background: rgba(154, 52, 18, .12);
 }
 
 .sm-actions {
