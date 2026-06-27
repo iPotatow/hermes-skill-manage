@@ -21,18 +21,16 @@
   const CardContent = C.CardContent || function (props) { return h("div", props, props.children); };
 
   const API = "/api/plugins/skill-manage";
-  const SOURCE_ORDER = ["all", "builtin", "hub-installed", "local", "orphaned-builtin"];
+  const SOURCE_ORDER = ["all", "builtin", "hub-installed", "local"];
   const TEXT = {
     en: {
       unknownError: "Unknown error",
-      sourceLabels: { all: "All skills", builtin: "Built-in", "hub-installed": "Hub installed", local: "Local", "orphaned-builtin": "Removed upstream" },
+      sourceLabels: { all: "All skills", builtin: "Built-in", "hub-installed": "Hub installed", local: "Local" },
       stats: { "hub-installed": "Hub installed", builtin: "Built-in", local: "Local", enabled: "Enabled" },
-      searchPlaceholder: "Search Name / Category / Source",
+      searchPlaceholder: "Search name",
       allCategories: "all categories",
       showDeletedBuiltin: "Show deleted built-ins",
       showDeletedBuiltinTitle: "Hidden by default; enable to show built-in skills that can be restored from the Hermes bundled source.",
-      showOrphanedBuiltin: "Show removed upstream",
-      showOrphanedBuiltinTitle: "Hidden by default; enable to show local skills that were previously bundled but no longer exist in the current Hermes bundled source.",
       refresh: "Refresh",
       refreshing: "Refreshing",
       empty: "No matching skills",
@@ -40,6 +38,7 @@
       columns: { name: "Name", category: "Category", source: "Source", trust: "Trust", status: "Status", actions: "Actions" },
       noDescription: "No description",
       actions: { delete: "Delete", reset: "Reset", update: "Update", restore: "Restore", install: "Install", installing: "Installing" },
+      deleting: "Deleting",
       confirmTitle: "Delete skill",
       confirmBody: function (name) { return "This permanently removes the local skill files for " + name + ". Type the skill name to confirm."; },
       confirmNameLabel: "Skill name",
@@ -55,7 +54,7 @@
       },
       heroKickerFallback: "Hermes skills directory",
       title: "Skill Manage",
-      subtitle: "Manage Hermes skills by source; deleted and removed-upstream built-ins are hidden by default and can be shown when needed.",
+      subtitle: "Manage Hermes skills by source; deleted built-in skills are hidden by default and can be shown when you need to restore them.",
       installTitle: "Install skill",
       installHint: "Supports URL, owner/repo, hub identifier, or optional catalog path.",
       targetPlaceholder: "identifier / URL / owner/repo",
@@ -66,14 +65,12 @@
     },
     zh: {
       unknownError: "未知错误",
-      sourceLabels: { all: "全部技能", builtin: "内建", "hub-installed": "Hub 安装", local: "本地", "orphaned-builtin": "官方已移除" },
+      sourceLabels: { all: "全部技能", builtin: "内建", "hub-installed": "Hub 安装", local: "本地" },
       stats: { "hub-installed": "Hub 安装", builtin: "内建", local: "本地", enabled: "启用" },
-      searchPlaceholder: "搜索名称 / 分类 / 来源",
+      searchPlaceholder: "搜索名称",
       allCategories: "全部分类",
       showDeletedBuiltin: "显示已删除内建",
       showDeletedBuiltinTitle: "默认隐藏；开启后显示可从 Hermes bundled 源恢复的内建技能。",
-      showOrphanedBuiltin: "显示官方已移除",
-      showOrphanedBuiltinTitle: "默认隐藏；开启后显示曾经是官方 bundled、但当前 Hermes 官方源已移除的本地残留技能。",
       refresh: "刷新",
       refreshing: "刷新中",
       empty: "没有匹配的技能",
@@ -81,6 +78,7 @@
       columns: { name: "名称", category: "分类", source: "来源", trust: "信任", status: "状态", actions: "操作" },
       noDescription: "无简介",
       actions: { delete: "删除", reset: "重置", update: "更新", restore: "恢复", install: "安装", installing: "安装中" },
+      deleting: "删除中",
       confirmTitle: "删除技能",
       confirmBody: function (name) { return "这会永久删除 " + name + " 的本地技能文件。请输入完整技能名确认。"; },
       confirmNameLabel: "技能名",
@@ -96,7 +94,7 @@
       },
       heroKickerFallback: "Hermes 技能目录",
       title: "技能管理",
-      subtitle: "按来源管理 Hermes 技能；已删除和官方已移除的内建技能默认隐藏，可按需显示。",
+      subtitle: "按来源管理 Hermes 技能；已删除的内建技能默认隐藏，可按需显示并恢复。",
       installTitle: "安装技能",
       installHint: "支持 URL、owner/repo、hub 标识或 optional catalog 路径。",
       targetPlaceholder: "identifier / URL / owner/repo",
@@ -164,7 +162,6 @@
     const raw = String(row.rawSource || row.source || "").toLowerCase();
     if (kind) return kind;
     if (source === "builtin") return "builtin";
-    if (source === "orphaned-builtin") return "orphaned-builtin";
     if (source === "local" && trust === "local") return "local";
     if (source === "hub-installed") return "hub-installed";
     if (trust === "community" || trust === "official") return "hub-installed";
@@ -262,15 +259,6 @@
         h("span", null, props.text.showDeletedBuiltin),
         h("code", null, props.missingBuiltinCount || 0)
       ),
-      h("label", { className: "sm-toggle", title: props.text.showOrphanedBuiltinTitle },
-        h("input", {
-          type: "checkbox",
-          checked: props.showOrphanedBuiltin,
-          onChange: function (e) { props.setShowOrphanedBuiltin(e.target.checked); },
-        }),
-        h("span", null, props.text.showOrphanedBuiltin),
-        h("code", null, props.orphanedBuiltinCount || 0)
-      ),
       h(Button, { onClick: props.onRefresh, disabled: props.loading }, props.loading ? props.text.refreshing : props.text.refresh)
     );
   }
@@ -300,7 +288,7 @@
       className: "sm-modal-backdrop",
       role: "presentation",
       onMouseDown: function (e) {
-        if (e.target === e.currentTarget) props.onCancel();
+        if (!props.busy && e.target === e.currentTarget) props.onCancel();
       },
     },
       h("div", {
@@ -313,7 +301,7 @@
       },
         h("div", { className: "sm-modal__head" },
           h("h3", { id: "sm-delete-title" }, props.text.confirmTitle),
-          h("button", { type: "button", className: "sm-modal__close", onClick: props.onCancel, "aria-label": props.text.close }, "×")
+          h("button", { type: "button", className: "sm-modal__close", onClick: props.onCancel, disabled: props.busy, "aria-label": props.text.close }, "×")
         ),
         h("p", { className: "sm-modal__body" }, props.text.confirmBody(row.name)),
         h("div", { className: "sm-modal__target" },
@@ -328,11 +316,12 @@
             value: value,
             onChange: function (e) { setValue(e.target.value); },
             placeholder: props.text.confirmPlaceholder,
+            disabled: props.busy,
           })
         ),
         h("div", { className: "sm-modal__actions" },
           h(Button, { kind: "quiet", onClick: props.onCancel, disabled: props.busy }, props.text.cancel),
-          h(Button, { kind: "danger", onClick: function () { props.onConfirm(value); }, disabled: !canConfirm }, props.text.actions.delete)
+          h(Button, { kind: "danger", onClick: function () { props.onConfirm(value); }, disabled: !canConfirm || props.busy }, props.busy ? props.text.deleting : props.text.actions.delete)
         )
       )
     );
@@ -378,7 +367,6 @@
           props.rows.map(function (row) {
             const busy = props.busyKey === row.kind + ":" + row.name;
             const deleted = row.status === "deleted";
-            const deprecated = row.status === "deprecated";
             const description = props.lang === "zh" ? (row.descriptionZh || row.description) : (row.descriptionEn || row.description);
             return h("tr", { key: row.kind + ":" + row.name },
               h("td", { className: "sm-name", title: row.installPath },
@@ -388,7 +376,7 @@
               h("td", { className: "sm-dim" }, row.category || ""),
               h("td", null, h(Pill, { tone: row.kind, title: row.kind }, row.source)),
               h("td", { className: "sm-dim" }, row.trustLevel || "-"),
-              h("td", null, h(Pill, { tone: deleted ? "deleted" : deprecated ? "deprecated" : row.status === "enabled" ? "enabled" : "disabled" }, row.status || "enabled")),
+              h("td", null, h(Pill, { tone: deleted ? "deleted" : row.status === "enabled" ? "enabled" : "disabled" }, row.status || "enabled")),
               h("td", { className: "sm-actions" },
                 deleted ? h(Button, { disabled: busy, onClick: function () { run(row, "restore"); } }, props.text.actions.restore) : null,
                 !deleted && row.kind === "builtin" ? h(Button, { disabled: busy, onClick: function () { run(row, "reset"); } }, props.text.actions.reset) : null,
@@ -493,7 +481,6 @@
     const [installBusy, setInstallBusy] = useState(false);
     const [pendingDelete, setPendingDelete] = useState(null);
     const [showMissingBuiltin, setShowMissingBuiltin] = useState(false);
-    const [showOrphanedBuiltin, setShowOrphanedBuiltin] = useState(false);
 
     const load = useCallback(function () {
       setLoading(true);
@@ -531,16 +518,13 @@
 
     const rawRows = data && data.skills ? data.skills : [];
     const rawMissingBuiltin = data && data.missingBuiltinSkills ? data.missingBuiltinSkills : [];
-    const rawOrphanedBuiltin = data && data.orphanedBuiltinSkills ? data.orphanedBuiltinSkills : [];
     const installedRows = useMemo(function () { return normalizeRows(rawRows); }, [rawRows]);
     const missingBuiltinRows = useMemo(function () { return normalizeRows(rawMissingBuiltin); }, [rawMissingBuiltin]);
-    const orphanedBuiltinRows = useMemo(function () { return normalizeRows(rawOrphanedBuiltin); }, [rawOrphanedBuiltin]);
     const rows = useMemo(function () {
       let next = installedRows;
       if (showMissingBuiltin) next = next.concat(missingBuiltinRows);
-      if (showOrphanedBuiltin) next = next.concat(orphanedBuiltinRows);
       return next;
-    }, [installedRows, missingBuiltinRows, orphanedBuiltinRows, showMissingBuiltin, showOrphanedBuiltin]);
+    }, [installedRows, missingBuiltinRows, showMissingBuiltin]);
     const counts = useMemo(function () { return countRows(installedRows); }, [installedRows]);
     const sourceCounts = useMemo(function () { return countRows(rows); }, [rows]);
     const enabledCount = installedRows.filter(function (row) { return row.status !== "disabled"; }).length;
@@ -557,8 +541,7 @@
         if (source !== "all" && row.kind !== source) return false;
         if (category !== "all" && (row.category || "(root)") !== category) return false;
         if (!q) return true;
-        return [row.name, row.category, row.source, row.kind, row.trustLevel, row.status, row.rawSource]
-          .join(" ").toLowerCase().indexOf(q) >= 0;
+        return String(row.name || "").toLowerCase().indexOf(q) >= 0;
       });
     }, [rows, query, source, category]);
 
@@ -587,9 +570,6 @@
           showMissingBuiltin: showMissingBuiltin,
           setShowMissingBuiltin: setShowMissingBuiltin,
           missingBuiltinCount: data ? data.missingBuiltinCount : 0,
-          showOrphanedBuiltin: showOrphanedBuiltin,
-          setShowOrphanedBuiltin: setShowOrphanedBuiltin,
-          orphanedBuiltinCount: data ? data.orphanedBuiltinCount : 0,
           text: text,
           loading: loading,
           onRefresh: load,
@@ -610,8 +590,9 @@
         onConfirm: function (confirm) {
           if (!pendingDelete) return;
           const row = pendingDelete;
-          setPendingDelete(null);
-          onAction("/delete", { source: row.kind, name: row.name, confirm: confirm }, text.notices.deleted(row.name));
+          onAction("/delete", { source: row.kind, name: row.name, confirm: confirm }, text.notices.deleted(row.name), function () {
+            setPendingDelete(null);
+          });
         },
       })
     );

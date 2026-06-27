@@ -402,13 +402,6 @@
   background: rgba(109, 40, 217, .1);
 }
 
-.sm-pill--deprecated,
-.sm-pill--orphaned-builtin {
-  color: #fdba74;
-  border-color: rgba(251, 146, 60, .42);
-  background: rgba(154, 52, 18, .12);
-}
-
 .sm-actions {
   display: flex;
   justify-content: flex-end;
