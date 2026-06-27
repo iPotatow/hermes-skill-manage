@@ -424,6 +424,7 @@
       setLoading(true);
       return api("/inventory").then(function (next) {
         setData(next);
+        return next;
       }).catch(function (err) {
         setToast({ text: parseError(err, text), error: true });
       }).finally(function () {
@@ -446,7 +447,26 @@
         if (after) after();
         return load();
       }).catch(function (err) {
-        notice(parseError(err, text), true);
+        const message = parseError(err, text);
+        if (path === "/delete" && /failed to fetch/i.test(message)) {
+          return load().then(function (next) {
+            if (!next || !Array.isArray(next.skills)) {
+              notice(message, true);
+              return;
+            }
+            const rows = next.skills;
+            const stillExists = rows.some(function (row) {
+              return (row.kind || row.source) === body.source && row.name === body.name;
+            });
+            if (!stillExists) {
+              notice(successText);
+              if (after) after();
+              return;
+            }
+            notice(message, true);
+          });
+        }
+        notice(message, true);
       }).finally(function () {
         setBusyKey("");
       });
