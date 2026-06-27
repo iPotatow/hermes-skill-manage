@@ -98,7 +98,7 @@
   display: flex;
   min-height: 2.25rem;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: .5rem;
   border: 1px solid transparent;
   border-right: 1px solid var(--sm-border);
@@ -127,13 +127,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: .78rem;
-}
-
-.sm-source code {
-  color: inherit;
-  font-family: var(--font-mono, var(--theme-font-mono, ui-monospace, monospace));
-  font-size: .75rem;
-  font-variant-numeric: tabular-nums;
 }
 
 .sm-main {

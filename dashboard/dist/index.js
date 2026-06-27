@@ -25,8 +25,8 @@
   const TEXT = {
     en: {
       unknownError: "Unknown error",
-      sourceLabels: { all: "All skills", builtin: "Built-in", "hub-installed": "Hub installed", local: "Local" },
-      stats: { "hub-installed": "Hub installed", builtin: "Built-in", local: "Local", enabled: "Enabled" },
+      sourceLabels: { all: "All", builtin: "Built-in", "hub-installed": "Community", local: "Local" },
+      stats: { "hub-installed": "Community", builtin: "Built-in", local: "Local", enabled: "Enabled" },
       searchPlaceholder: "Search name",
       allCategories: "all categories",
       showDeletedBuiltin: "Show deleted built-ins",
@@ -65,8 +65,8 @@
     },
     zh: {
       unknownError: "未知错误",
-      sourceLabels: { all: "全部技能", builtin: "内建", "hub-installed": "Hub 安装", local: "本地" },
-      stats: { "hub-installed": "Hub 安装", builtin: "内建", local: "本地", enabled: "启用" },
+      sourceLabels: { all: "全部", builtin: "内建", "hub-installed": "社区", local: "本地" },
+      stats: { "hub-installed": "社区", builtin: "内建", local: "本地", enabled: "启用" },
       searchPlaceholder: "搜索名称",
       allCategories: "全部分类",
       showDeletedBuiltin: "显示已删除内建",
@@ -195,15 +195,13 @@
   function SourceTabs(props) {
     return h("div", { className: "sm-source-tabs", "aria-label": props.text.columns.source },
       SOURCE_ORDER.map(function (source) {
-        const count = source === "all" ? props.total : props.counts[source] || 0;
         return h("button", {
           key: source,
           type: "button",
           className: cx("sm-source", props.source === source && "sm-source--active"),
           onClick: function () { props.setSource(source); },
         },
-          h("span", null, sourceLabel(source, props.text)),
-          h("code", null, count)
+          h("span", null, sourceLabel(source, props.text))
         );
       })
     );
