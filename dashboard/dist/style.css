@@ -88,7 +88,8 @@
 
 .sm-source-tabs {
   display: flex;
-  min-width: 0;
+  flex: 0 1 auto;
+  min-width: max-content;
   align-items: stretch;
   border: 1px solid var(--sm-border);
   overflow-x: auto;
@@ -137,13 +138,21 @@
 }
 
 .sm-toolbar {
-  display: grid;
-  grid-template-columns: minmax(280px, .9fr) minmax(220px, 1fr) minmax(150px, 220px) auto auto auto auto;
+  display: flex;
+  flex-wrap: wrap;
   gap: .55rem;
   align-items: center;
   border: 1px solid var(--sm-border);
   background: color-mix(in srgb, var(--sm-card) 70%, transparent);
   padding: .55rem;
+}
+
+.sm-toolbar > .sm-select {
+  flex: 0 1 12rem;
+}
+
+.sm-toolbar > .sm-input {
+  flex: 1 1 16rem;
 }
 
 .sm-input,
@@ -403,71 +412,6 @@
   white-space: nowrap;
 }
 
-.sm-secondary-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(320px, .9fr);
-  gap: .9rem;
-  align-items: start;
-}
-
-.sm-install {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(160px, 240px) auto;
-  gap: .55rem;
-  align-items: center;
-  padding: .9rem 1rem;
-}
-
-.sm-check {
-  display: inline-flex;
-  min-height: 2.25rem;
-  align-items: center;
-  gap: .5rem;
-  color: var(--sm-muted);
-  font-size: .78rem;
-  white-space: nowrap;
-}
-
-.sm-catalog {
-  display: flex;
-  flex-wrap: wrap;
-  gap: .4rem;
-  border-top: 1px solid var(--sm-border);
-  padding: .85rem 1rem 1rem;
-}
-
-.sm-catalog button {
-  max-width: 16rem;
-  border: 1px solid var(--sm-border);
-  background: rgba(0, 0, 0, .12);
-  color: var(--sm-muted);
-  padding: .45rem .55rem;
-  font-family: var(--font-mono, var(--theme-font-mono, ui-monospace, monospace));
-  font-size: .7rem;
-  text-align: left;
-  cursor: pointer;
-}
-
-.sm-catalog button:hover {
-  border-color: var(--color-ring, var(--sm-text));
-  color: var(--sm-text);
-}
-
-.sm-catalog strong,
-.sm-catalog span {
-  display: block;
-  overflow-wrap: anywhere;
-}
-
-.sm-catalog strong {
-  color: var(--sm-text);
-}
-
-.sm-catalog span {
-  margin-top: .25rem;
-  color: var(--sm-dim);
-}
-
 .sm-history {
   display: flex;
   flex-direction: column;
@@ -630,18 +574,24 @@
 }
 
 @media (max-width: 1180px) {
-  .sm-hero,
-  .sm-secondary-grid {
+  .sm-hero {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 760px) {
   .sm-stat-strip,
-  .sm-toolbar,
-  .sm-install,
   .sm-history__row {
     grid-template-columns: 1fr;
+  }
+
+  .sm-source-tabs,
+  .sm-toolbar > .sm-select,
+  .sm-toolbar > .sm-input,
+  .sm-result-count,
+  .sm-toggle,
+  .sm-toolbar > .sm-btn {
+    flex-basis: 100%;
   }
 
   .sm-result-count {

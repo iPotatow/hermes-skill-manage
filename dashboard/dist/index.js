@@ -37,7 +37,7 @@
       installedSkills: "Installed Skills",
       columns: { name: "Name", category: "Category", source: "Source", trust: "Trust", status: "Status", actions: "Actions" },
       noDescription: "No description",
-      actions: { delete: "Delete", reset: "Reset", update: "Update", restore: "Restore", install: "Install", installing: "Installing" },
+      actions: { delete: "Delete", reset: "Reset", update: "Update", restore: "Restore" },
       deleting: "Deleting",
       confirmTitle: "Delete skill",
       confirmBody: function (name) { return "This permanently removes the local skill files for " + name + ". Type the skill name to confirm."; },
@@ -50,16 +50,10 @@
         reset: function (name) { return "Reset: " + name; },
         updated: function (name) { return "Updated: " + name; },
         restored: function (name) { return "Restored: " + name; },
-        installed: function (name) { return "Installed: " + name; },
       },
       heroKickerFallback: "Hermes skills directory",
       title: "Skill Manage",
       subtitle: "Manage Hermes skills by source; deleted built-in skills are hidden by default and can be shown when you need to restore them.",
-      installTitle: "Install skill",
-      installHint: "Supports URL, owner/repo, hub identifier, or optional catalog path.",
-      targetPlaceholder: "identifier / URL / owner/repo",
-      categoryPlaceholder: "category",
-      forceLabel: "force",
       recentTitle: "Recent actions",
       recentHint: "Last 8 management actions",
     },
@@ -77,7 +71,7 @@
       installedSkills: "技能清单",
       columns: { name: "名称", category: "分类", source: "来源", trust: "信任", status: "状态", actions: "操作" },
       noDescription: "无简介",
-      actions: { delete: "删除", reset: "重置", update: "更新", restore: "恢复", install: "安装", installing: "安装中" },
+      actions: { delete: "删除", reset: "重置", update: "更新", restore: "恢复" },
       deleting: "删除中",
       confirmTitle: "删除技能",
       confirmBody: function (name) { return "这会永久删除 " + name + " 的本地技能文件。请输入完整技能名确认。"; },
@@ -90,16 +84,10 @@
         reset: function (name) { return "已重置：" + name; },
         updated: function (name) { return "已更新：" + name; },
         restored: function (name) { return "已恢复：" + name; },
-        installed: function (name) { return "已安装：" + name; },
       },
       heroKickerFallback: "Hermes 技能目录",
       title: "技能管理",
       subtitle: "按来源管理 Hermes 技能；已删除的内建技能默认隐藏，可按需显示并恢复。",
-      installTitle: "安装技能",
-      installHint: "支持 URL、owner/repo、hub 标识或 optional catalog 路径。",
-      targetPlaceholder: "identifier / URL / owner/repo",
-      categoryPlaceholder: "分类",
-      forceLabel: "force",
       recentTitle: "最近操作",
       recentHint: "最近 8 条管理动作",
     },
@@ -131,9 +119,20 @@
 
   function parseError(err, text) {
     const raw = err && err.message ? String(err.message) : String(err || (text && text.unknownError) || "Unknown error");
+    function stringifyDetail(detail) {
+      if (typeof detail === "string") return detail;
+      if (Array.isArray(detail)) {
+        return detail.map(function (item) {
+          if (!item || typeof item !== "object") return String(item);
+          return item.msg || item.message || JSON.stringify(item);
+        }).join("; ");
+      }
+      if (detail && typeof detail === "object") return detail.msg || detail.message || JSON.stringify(detail);
+      return String(detail || raw);
+    }
     try {
       const parsed = JSON.parse(raw.replace(/^\d+:\s*/, ""));
-      return parsed.detail || raw;
+      return parsed.detail ? stringifyDetail(parsed.detail) : raw;
     } catch (_e) {
       return raw;
     }
@@ -234,12 +233,6 @@
         total: props.total,
         text: props.text,
       }),
-      h(Input, {
-        className: "sm-input",
-        value: props.query,
-        onChange: function (e) { props.setQuery(e.target.value); },
-        placeholder: props.text.searchPlaceholder,
-      }),
       h("select", {
         className: "sm-select",
         value: props.category,
@@ -247,6 +240,12 @@
       }, props.categories.map(function (category) {
         return h("option", { key: category, value: category }, category === "all" ? props.text.allCategories : category);
       })),
+      h(Input, {
+        className: "sm-input",
+        value: props.query,
+        onChange: function (e) { props.setQuery(e.target.value); },
+        placeholder: props.text.searchPlaceholder,
+      }),
       h("span", { className: "sm-result-count" }, props.filtered + " / " + props.total),
       h("label", { className: "sm-toggle", title: props.text.showDeletedBuiltinTitle },
         h("input", {
@@ -389,64 +388,6 @@
     );
   }
 
-  function InstallPanel(props) {
-    const [target, setTarget] = useState("");
-    const [category, setCategory] = useState("");
-    const [force, setForce] = useState(false);
-
-    function install() {
-      if (!target.trim()) return;
-      props.onAction("/install", {
-        target: target.trim(),
-        category: category.trim(),
-        force: force,
-      }, props.text.notices.installed(target.trim()), function () {
-        setTarget("");
-      });
-    }
-
-    return h(Card, { className: "sm-card" }, h(CardContent, { className: "sm-card__content" },
-      h("div", { className: "sm-card__head" },
-        h("div", null, h("h3", null, props.text.installTitle), h("p", null, props.text.installHint)),
-        h(Button, { disabled: !target.trim() || props.busy, onClick: install }, props.busy ? props.text.actions.installing : props.text.actions.install)
-      ),
-      h("div", { className: "sm-install" },
-        h(Input, {
-          className: "sm-input",
-          value: target,
-          onChange: function (e) { setTarget(e.target.value); },
-          placeholder: props.text.targetPlaceholder,
-        }),
-        h(Input, {
-          className: "sm-input",
-          value: category,
-          onChange: function (e) { setCategory(e.target.value); },
-          placeholder: props.text.categoryPlaceholder,
-        }),
-        h("label", { className: "sm-check" },
-          h("input", {
-            type: "checkbox",
-            checked: force,
-            onChange: function (e) { setForce(e.target.checked); },
-          }),
-          h("span", null, props.text.forceLabel)
-        )
-      ),
-      props.optional && props.optional.length ? h("div", { className: "sm-catalog" },
-        props.optional.slice(0, 12).map(function (item) {
-          return h("button", {
-            key: item.identifier,
-            type: "button",
-            onClick: function () {
-              setTarget(item.identifier);
-              setCategory(item.category || "");
-            },
-          }, h("strong", null, item.name), h("span", null, item.identifier));
-        })
-      ) : null
-    ));
-  }
-
   function HistoryPanel(props) {
     if (!props.history.length) return null;
     return h(Card, { className: "sm-card" }, h(CardContent, { className: "sm-card__content" },
@@ -476,7 +417,6 @@
     const [category, setCategory] = useState("all");
     const [toast, setToast] = useState(null);
     const [busyKey, setBusyKey] = useState("");
-    const [installBusy, setInstallBusy] = useState(false);
     const [pendingDelete, setPendingDelete] = useState(null);
     const [showMissingBuiltin, setShowMissingBuiltin] = useState(false);
 
@@ -499,10 +439,9 @@
     }
 
     function onAction(path, body, successText, after) {
-      const key = body.source && body.name ? body.source + ":" + body.name : "install";
-      if (key === "install") setInstallBusy(true);
-      else setBusyKey(key);
-      api(path, { method: "POST", body: body }).then(function () {
+      const key = body.source && body.name ? body.source + ":" + body.name : "";
+      setBusyKey(key);
+      api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(function () {
         notice(successText);
         if (after) after();
         return load();
@@ -510,7 +449,6 @@
         notice(parseError(err, text), true);
       }).finally(function () {
         setBusyKey("");
-        setInstallBusy(false);
       });
     }
 
@@ -575,10 +513,7 @@
         h(Card, { className: "sm-card sm-table-card" }, h(CardContent, { className: "sm-card__content" },
           h(SkillsTable, { rows: filtered, busyKey: busyKey, onAction: onAction, onDeleteRequest: setPendingDelete, text: text, lang: lang })
         )),
-        h("div", { className: "sm-secondary-grid" },
-          h(InstallPanel, { optional: data && data.optional ? data.optional : [], busy: installBusy, onAction: onAction, text: text }),
-          h(HistoryPanel, { history: data && data.history ? data.history : [], text: text })
-        )
+        h(HistoryPanel, { history: data && data.history ? data.history : [], text: text })
       ),
       h(DeleteConfirmDialog, {
         row: pendingDelete,
