@@ -44,6 +44,7 @@
       confirmBody: function (name) { return "This permanently removes the local skill files for " + name + ". Type the skill name to confirm."; },
       confirmNameLabel: "Skill name",
       confirmPlaceholder: "Type the exact skill name",
+      close: "Close",
       cancel: "Cancel",
       notices: {
         deleted: function (name) { return "Deleted: " + name; },
@@ -84,6 +85,7 @@
       confirmBody: function (name) { return "这会永久删除 " + name + " 的本地技能文件。请输入完整技能名确认。"; },
       confirmNameLabel: "技能名",
       confirmPlaceholder: "输入完整技能名",
+      close: "关闭",
       cancel: "取消",
       notices: {
         deleted: function (name) { return "已删除：" + name; },
@@ -294,17 +296,24 @@
       }
     }
 
-    return h("div", { className: "sm-modal-backdrop", role: "presentation" },
+    return h("div", {
+      className: "sm-modal-backdrop",
+      role: "presentation",
+      onMouseDown: function (e) {
+        if (e.target === e.currentTarget) props.onCancel();
+      },
+    },
       h("div", {
         className: "sm-modal",
         role: "dialog",
         "aria-modal": "true",
         "aria-labelledby": "sm-delete-title",
         onKeyDown: onKeyDown,
+        onMouseDown: function (e) { e.stopPropagation(); },
       },
         h("div", { className: "sm-modal__head" },
           h("h3", { id: "sm-delete-title" }, props.text.confirmTitle),
-          h("button", { type: "button", className: "sm-modal__close", onClick: props.onCancel, "aria-label": props.text.cancel }, "×")
+          h("button", { type: "button", className: "sm-modal__close", onClick: props.onCancel, "aria-label": props.text.close }, "×")
         ),
         h("p", { className: "sm-modal__body" }, props.text.confirmBody(row.name)),
         h("div", { className: "sm-modal__target" },

@@ -554,14 +554,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, .58);
+  background: rgba(0, 0, 0, .5);
   padding: 1rem;
 }
 
 .sm-modal {
   width: min(32rem, 100%);
-  border: 1px solid var(--sm-border);
-  background: color-mix(in srgb, var(--sm-card) 94%, #000);
+  max-height: min(90vh, 36rem);
+  overflow: auto;
+  border: 1px solid var(--color-border, rgba(255, 230, 203, .28));
+  background: var(--color-card, var(--background-base, #061818));
   color: var(--sm-text);
   box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, .5);
 }
