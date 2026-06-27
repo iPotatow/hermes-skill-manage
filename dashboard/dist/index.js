@@ -40,7 +40,11 @@
       columns: { name: "Name", category: "Category", source: "Source", trust: "Trust", status: "Status", actions: "Actions" },
       noDescription: "No description",
       actions: { delete: "Delete", reset: "Reset", update: "Update", restore: "Restore", install: "Install", installing: "Installing" },
-      confirmPrompt: function (action, name) { return action + " requires confirmation.\nType the skill name: " + name; },
+      confirmTitle: "Delete skill",
+      confirmBody: function (name) { return "This permanently removes the local skill files for " + name + ". Type the skill name to confirm."; },
+      confirmNameLabel: "Skill name",
+      confirmPlaceholder: "Type the exact skill name",
+      cancel: "Cancel",
       notices: {
         deleted: function (name) { return "Deleted: " + name; },
         reset: function (name) { return "Reset: " + name; },
@@ -76,7 +80,11 @@
       columns: { name: "名称", category: "分类", source: "来源", trust: "信任", status: "状态", actions: "操作" },
       noDescription: "无简介",
       actions: { delete: "删除", reset: "重置", update: "更新", restore: "恢复", install: "安装", installing: "安装中" },
-      confirmPrompt: function (action, name) { return action + "需要二次确认。\n请输入技能名：" + name; },
+      confirmTitle: "删除技能",
+      confirmBody: function (name) { return "这会永久删除 " + name + " 的本地技能文件。请输入完整技能名确认。"; },
+      confirmNameLabel: "技能名",
+      confirmPlaceholder: "输入完整技能名",
+      cancel: "取消",
       notices: {
         deleted: function (name) { return "已删除：" + name; },
         reset: function (name) { return "已重置：" + name; },
@@ -129,11 +137,6 @@
     } catch (_e) {
       return raw;
     }
-  }
-
-  function confirmName(name, actionLabel, text) {
-    const value = window.prompt(text.confirmPrompt(actionLabel, name));
-    return value === name ? value : null;
   }
 
   function Button(props) {
@@ -270,6 +273,62 @@
     );
   }
 
+  function DeleteConfirmDialog(props) {
+    const [value, setValue] = useState("");
+    const row = props.row;
+
+    useEffect(function () {
+      setValue("");
+    }, [row && row.name]);
+
+    if (!row) return null;
+    const canConfirm = value === row.name && !props.busy;
+
+    function onKeyDown(e) {
+      if (e.key === "Escape") {
+        props.onCancel();
+        return;
+      }
+      if (e.key === "Enter" && canConfirm) {
+        props.onConfirm(value);
+      }
+    }
+
+    return h("div", { className: "sm-modal-backdrop", role: "presentation" },
+      h("div", {
+        className: "sm-modal",
+        role: "dialog",
+        "aria-modal": "true",
+        "aria-labelledby": "sm-delete-title",
+        onKeyDown: onKeyDown,
+      },
+        h("div", { className: "sm-modal__head" },
+          h("h3", { id: "sm-delete-title" }, props.text.confirmTitle),
+          h("button", { type: "button", className: "sm-modal__close", onClick: props.onCancel, "aria-label": props.text.cancel }, "×")
+        ),
+        h("p", { className: "sm-modal__body" }, props.text.confirmBody(row.name)),
+        h("div", { className: "sm-modal__target" },
+          h("span", null, row.name),
+          h("code", null, row.kind)
+        ),
+        h("label", { className: "sm-modal__field" },
+          h("span", null, props.text.confirmNameLabel),
+          h(Input, {
+            autoFocus: true,
+            className: "sm-input",
+            value: value,
+            onChange: function (e) { setValue(e.target.value); },
+            placeholder: props.text.confirmPlaceholder,
+          })
+        ),
+        h("div", { className: "sm-modal__actions" },
+          h(Button, { kind: "quiet", onClick: props.onCancel, disabled: props.busy }, props.text.cancel),
+          h(Button, { kind: "danger", onClick: function () { props.onConfirm(value); }, disabled: !canConfirm }, props.text.actions.delete)
+        )
+      )
+    );
+  }
+
   function SkillsTable(props) {
     if (!props.rows.length) {
       return h("div", { className: "sm-empty" }, props.text.empty);
@@ -277,9 +336,7 @@
 
     function run(row, action) {
       if (action === "delete") {
-        const confirm = confirmName(row.name, props.text.actions.delete, props.text);
-        if (!confirm) return;
-        props.onAction("/delete", { source: row.kind, name: row.name, confirm: confirm }, props.text.notices.deleted(row.name));
+        props.onDeleteRequest(row);
         return;
       }
       if (action === "reset") {
@@ -425,6 +482,7 @@
     const [toast, setToast] = useState(null);
     const [busyKey, setBusyKey] = useState("");
     const [installBusy, setInstallBusy] = useState(false);
+    const [pendingDelete, setPendingDelete] = useState(null);
     const [showMissingBuiltin, setShowMissingBuiltin] = useState(false);
     const [showOrphanedBuiltin, setShowOrphanedBuiltin] = useState(false);
 
@@ -528,13 +586,25 @@
           onRefresh: load,
         }),
         h(Card, { className: "sm-card sm-table-card" }, h(CardContent, { className: "sm-card__content" },
-          h(SkillsTable, { rows: filtered, busyKey: busyKey, onAction: onAction, text: text, lang: lang })
+          h(SkillsTable, { rows: filtered, busyKey: busyKey, onAction: onAction, onDeleteRequest: setPendingDelete, text: text, lang: lang })
         )),
         h("div", { className: "sm-secondary-grid" },
           h(InstallPanel, { optional: data && data.optional ? data.optional : [], busy: installBusy, onAction: onAction, text: text }),
           h(HistoryPanel, { history: data && data.history ? data.history : [], text: text })
         )
-      )
+      ),
+      h(DeleteConfirmDialog, {
+        row: pendingDelete,
+        busy: pendingDelete ? busyKey === pendingDelete.kind + ":" + pendingDelete.name : false,
+        text: text,
+        onCancel: function () { setPendingDelete(null); },
+        onConfirm: function (confirm) {
+          if (!pendingDelete) return;
+          const row = pendingDelete;
+          setPendingDelete(null);
+          onAction("/delete", { source: row.kind, name: row.name, confirm: confirm }, text.notices.deleted(row.name));
+        },
+      })
     );
   }
 
